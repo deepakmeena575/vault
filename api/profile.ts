@@ -26,9 +26,18 @@ export default async function handler(req: any, res: any) {
       }
       const { id, full_name, mobile_number, email, role } = body;
       
+      console.log("PROFILE_USER_ID", id);
+      
       if (!supabase) {
         console.error("PROFILE_CREATE_ERROR: Supabase not configured on server.");
         return res.status(500).json({ success: false, error: "Supabase not configured on server" });
+      }
+
+      const { data: authUser } = await supabase.auth.admin.getUserById(id);
+      console.log("AUTH_USER_EXISTS", !!authUser?.user);
+
+      if (!authUser?.user) {
+        return res.status(400).json({ success: false, error: "Auth user not found" });
       }
 
       console.log("Attempting to insert profile for ID:", id);
