@@ -57,7 +57,11 @@ export const Photos: React.FC = () => {
         const file = files[i];
         
         try {
+            const foldername = storagePath.split('/')[0];
             console.log("UPLOAD_START", file.name);
+            console.log("DIAGNOSTIC - auth.uid():", user.id);
+            console.log("DIAGNOSTIC - storagePath:", storagePath);
+            console.log("DIAGNOSTIC - storage.foldername(name):", foldername);
             setUploadProgress(10);
             
             // Upload to Supabase Storage

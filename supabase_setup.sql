@@ -70,20 +70,35 @@ VALUES ('photos', 'photos', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies
+
+-- 1. SELECT (View) policy
 DROP POLICY IF EXISTS "Users can view their own photos in storage" ON storage.objects;
 CREATE POLICY "Users can view their own photos in storage"
   ON storage.objects FOR SELECT
-  USING ( bucket_id = 'photos' AND auth.uid() = owner );
+  TO authenticated
+  USING ( bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text );
 
-DROP POLICY IF EXISTS "Users can upload their own photos to storage" ON storage.objects;
-CREATE POLICY "Users can upload their own photos to storage"
+-- 2. TEMPORARY RELAXED INSERT POLICY (requested for testing/quick resolution)
+DROP POLICY IF EXISTS "Users can upload photos" ON storage.objects;
+CREATE POLICY "Users can upload photos"
   ON storage.objects FOR INSERT
-  WITH CHECK ( bucket_id = 'photos' AND auth.uid() = owner );
+  TO authenticated
+  WITH CHECK (bucket_id = 'photos');
 
+-- 3. RECOMMENDED SECURE INSERT POLICY (Use this once upload is verified to restrict folders strictly to user's auth.uid)
+-- DROP POLICY IF EXISTS "Users can upload photos" ON storage.objects;
+-- DROP POLICY IF EXISTS "Users can upload their own photos to storage" ON storage.objects;
+-- CREATE POLICY "Users can upload their own photos to storage"
+--   ON storage.objects FOR INSERT
+--   TO authenticated
+--   WITH CHECK ( bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text );
+
+-- 4. DELETE policy
 DROP POLICY IF EXISTS "Users can delete their own photos from storage" ON storage.objects;
 CREATE POLICY "Users can delete their own photos from storage"
   ON storage.objects FOR DELETE
-  USING ( bucket_id = 'photos' AND auth.uid() = owner );
+  TO authenticated
+  USING ( bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text );
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
