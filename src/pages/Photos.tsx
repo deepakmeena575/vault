@@ -109,14 +109,26 @@ export const Photos: React.FC = () => {
             }
 
             // Insert metadata into Supabase
+            console.log('DB_INSERT_PAYLOAD', JSON.stringify({
+              user_id: user.id,
+              file_name: file.name,
+              storage_path: storagePath,
+              file_url: signedUrlData?.signedUrl || ''
+            }, null, 2));
+
             console.log("Awaiting supabase.from('photos').insert...");
-            const { data: dbData, error: dbError } = await supabase.from('photos').insert({
+            const result = await supabase
+              .from('photos')
+              .insert({
                 user_id: user.id,
-                folder_id: selectedFolder || null,
                 file_name: file.name,
                 storage_path: storagePath,
                 file_url: signedUrlData?.signedUrl || ''
-            });
+              })
+              .select();
+
+            console.log('DB_INSERT_RESULT', result);
+            const { data: dbData, error: dbError } = result;
 
             if (dbError) {
               console.error("PHOTO_DB_INSERT_ERROR", dbError);
