@@ -69,6 +69,18 @@ export const Photos: React.FC = () => {
             console.log("DIAGNOSTIC - storage.foldername(name):", foldername);
             setUploadProgress(10);
             
+            console.log("USER_OBJECT", user);
+            console.log("USER_ID", user?.id);
+            console.log("SUPABASE_AUTH_SESSION_CHECK_START");
+
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+            console.log("SESSION_DATA", sessionData);
+            console.log("SESSION_ERROR", sessionError);
+
+            console.log("UPLOAD_BUCKET", "photos");
+            console.log("UPLOAD_PATH", storagePath);
+
             // Upload to Supabase Storage
             console.log("Awaiting supabase.storage.upload...");
             const { data: uploadData, error: uploadError } = await supabase.storage
@@ -79,6 +91,7 @@ export const Photos: React.FC = () => {
               
             if (uploadError) {
               console.error("UPLOAD_ERROR", uploadError);
+              console.error("UPLOAD_ERROR_FULL", JSON.stringify(uploadError, null, 2));
               throw uploadError;
             }
             
