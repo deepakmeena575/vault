@@ -16,27 +16,35 @@ export default async function handler(req: any, res: any) {
 
   if (req.method === 'POST') {
     console.log("PROFILE_CREATE_START");
+    console.log("REQUEST_BODY", req.body);
     try {
-      const { id, full_name, mobile_number, email, role } = req.body;
+      let body = req.body;
+      if (typeof body === 'string') {
+        try {
+          body = JSON.parse(body);
+        } catch (e) {}
+      }
+      const { id, full_name, mobile_number, email, role } = body;
       
       if (!supabase) {
         console.error("PROFILE_CREATE_ERROR: Supabase not configured on server.");
         return res.status(500).json({ success: false, error: "Supabase not configured on server" });
       }
 
+      console.log("Attempting to insert profile for ID:", id);
       const { data, error } = await supabase.from('profiles').insert([
         { id, full_name, mobile_number, email, role: role || 'user' }
       ]).select().single();
 
       if (error) {
-        console.error("PROFILE_CREATE_ERROR:", error);
-        return res.status(500).json({ success: false, error: error.message });
+        console.error("PROFILE_CREATE_ERROR (Supabase error):", error);
+        return res.status(500).json({ success: false, error: error.message, details: error });
       }
       
-      console.log("PROFILE_CREATE_SUCCESS");
+      console.log("PROFILE_CREATE_SUCCESS", data);
       return res.status(200).json({ success: true, profile: data });
     } catch (error: any) {
-      console.error("PROFILE_CREATE_ERROR:", error);
+      console.error("PROFILE_CREATE_ERROR (Catch block):", error);
       return res.status(500).json({ success: false, error: error.message });
     }
   } else if (req.method === 'GET') {
