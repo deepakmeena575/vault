@@ -21,7 +21,7 @@ export interface Photo {
   user_id: string;
   folder_id: string | null;
   file_name: string;
-  drive_file_id: string;
+  storage_path: string;
   file_url?: string;
   uploaded_at: string;
 }

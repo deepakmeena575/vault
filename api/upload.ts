@@ -1,6 +1,4 @@
 import { supabase } from '../lib/server-supabase.js';
-import { getDriveClient } from '../lib/googleDrive.js';
-import { Readable } from 'stream';
 import multer from 'multer';
 
 // Vercel serverless function config to allow multer parsing
@@ -18,8 +16,8 @@ function runMiddleware(req: any, res: any, fn: any) {
       if (result instanceof Error) {
         return reject(result);
       }
-      return resolve(result);
-    });
+        return resolve(result);
+      });
   });
 }
 
@@ -45,8 +43,7 @@ export default async function handler(req: any, res: any) {
     await runMiddleware(req, res, upload.single('file'));
     
     console.log("UPLOAD_START");
-    console.log('[Upload] Request received directly in serverless function');
-    const { folder_id, user_id, folder_name } = req.body;
+    const { folder_id, user_id } = req.body;
     const file = req.file;
     
     console.log("UPLOAD_USER_ID", user_id);
@@ -55,71 +52,74 @@ export default async function handler(req: any, res: any) {
       console.log('[Upload] Error: No file provided');
       return res.status(400).json({ error: "No file provided", success: false });
     }
+    
+    if (!user_id) {
+      console.log('[Upload] Error: No user ID provided');
+      return res.status(400).json({ error: "No user ID provided", success: false });
+    }
 
     console.log("FILE_NAME", file.originalname);
     console.log("FILE_SIZE", file.size);
 
-    const drive = getDriveClient();
-    if (!drive) {
-      console.log('[Upload] Error: Google Drive auth failed');
-      return res.status(500).json({ error: "Google Drive is not configured. Please set GOOGLE_PRIVATE_KEY and GOOGLE_SERVICE_ACCOUNT_EMAIL.", success: false });
+    if (!supabase) {
+      console.log('[Upload] Error: Supabase client not configured');
+      return res.status(500).json({ error: "Supabase is not configured.", success: false });
+    }
+
+    const fileExt = file.originalname.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+    const storagePath = `${user_id}/${fileName}`;
+
+    console.log(`[Upload] Uploading to Supabase Storage: ${storagePath}`);
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('photos')
+      .upload(storagePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error("SUPABASE_STORAGE_UPLOAD_ERROR", uploadError);
+      return res.status(500).json({ error: "Failed to upload to storage", details: uploadError, success: false });
     }
     
-    console.log('[Upload] Google Drive authentication success');
-    console.log(`[Upload] Upload started for ${file.originalname}`);
+    console.log("STORAGE_UPLOAD_SUCCESS", uploadData.path);
 
-    let targetDriveFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || process.env.GOOGLE_DRIVE_ROOT_FOLDER;
+    console.log('[Upload] Starting Supabase database insert');
+    
+    // Generate a temporary signed URL for immediate use if needed
+    const { data: signedUrlData } = await supabase.storage.from('photos').createSignedUrl(storagePath, 60 * 60);
+    const fileUrl = signedUrlData?.signedUrl || '';
 
-    const bufferStream = new Readable();
-    bufferStream.push(file.buffer);
-    bufferStream.push(null);
-
-    const fileMetadata: any = {
-      name: file.originalname,
-      parents: targetDriveFolderId ? [targetDriveFolderId] : [],
+    const insertData = {
+      user_id,
+      folder_id: folder_id || null,
+      file_name: file.originalname,
+      storage_path: storagePath,
+      file_url: fileUrl
     };
-
-    const media = {
-      mimeType: file.mimetype,
-      body: bufferStream,
-    };
-
-    const driveRes = await drive.files.create({
-      requestBody: fileMetadata,
-      media: media,
-      fields: "id, webViewLink, webContentLink",
+      
+    const { data, error } = await supabase.from('photos').insert(insertData).select().single();
+      
+    if (error) {
+      console.error("PHOTO_DB_INSERT_ERROR", error);
+      // Clean up the uploaded file if database insert fails
+      await supabase.storage.from('photos').remove([storagePath]);
+      return res.status(500).json({ error: "Failed to save metadata to DB", details: error, success: false });
+    }
+      
+    console.log("PHOTO_DB_INSERT_SUCCESS", data.id);
+    console.log('[Upload] Response sent (Success)');
+    
+    return res.status(200).json({ 
+      photo: data, 
+      success: true, 
+      file_name: file.originalname, 
+      file_url: fileUrl, 
+      storage_path: storagePath 
     });
 
-    const drive_file_id = driveRes.data.id;
-    const file_url = driveRes.data.webViewLink || driveRes.data.webContentLink || '';
-    console.log("DRIVE_UPLOAD_SUCCESS", drive_file_id);
-    console.log(`[Upload] Upload completed. Successfully uploaded ${file.originalname} to Drive. ID: ${drive_file_id}`);
-
-    if (supabase) {
-      console.log('[Upload] Starting Supabase insert');
-      const insertData = {
-        user_id,
-        folder_id: folder_id || null,
-        file_name: file.originalname,
-        drive_file_id,
-        file_url
-      };
-      
-      const { data, error } = await supabase.from('photos').insert(insertData).select().single();
-      
-      if (error) {
-        console.error("UPLOAD_ERROR", error);
-        return res.status(500).json({ error: "Failed to save metadata to DB", details: error, success: false });
-      }
-      
-      console.log("PHOTO_DB_INSERT_SUCCESS");
-      console.log('[Upload] Supabase insert completed');
-      console.log('[Upload] Response sent (Success)');
-      return res.status(200).json({ photo: data, success: true, file_name: file.originalname, file_url, drive_file_id });
-    }
-
-    console.log('[Upload] Response sent (Success - No Supabase)');
-    return res.status(200).json({ drive_file_id, file_url, file_name: file.originalname, success: true });
   } catch (error: any) {
     console.error("UPLOAD_ERROR", error);
     return res.status(500).json({ error: String(error), details: error, stack: error?.stack, success: false });

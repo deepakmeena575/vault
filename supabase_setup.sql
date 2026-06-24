@@ -34,8 +34,9 @@ CREATE TABLE IF NOT EXISTS public.photos (
   user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   folder_id uuid,
   file_name text NOT NULL,
-  drive_file_id text NOT NULL,
+  storage_path text,
   file_url text,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   uploaded_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -62,6 +63,27 @@ DROP POLICY IF EXISTS "Admins can view all photos" ON public.photos;
 CREATE POLICY "Admins can view all photos"
   ON public.photos FOR SELECT
   USING ( EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') );
+
+-- Storage bucket setup
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('photos', 'photos', false) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies
+DROP POLICY IF EXISTS "Users can view their own photos in storage" ON storage.objects;
+CREATE POLICY "Users can view their own photos in storage"
+  ON storage.objects FOR SELECT
+  USING ( bucket_id = 'photos' AND auth.uid() = owner );
+
+DROP POLICY IF EXISTS "Users can upload their own photos to storage" ON storage.objects;
+CREATE POLICY "Users can upload their own photos to storage"
+  ON storage.objects FOR INSERT
+  WITH CHECK ( bucket_id = 'photos' AND auth.uid() = owner );
+
+DROP POLICY IF EXISTS "Users can delete their own photos from storage" ON storage.objects;
+CREATE POLICY "Users can delete their own photos from storage"
+  ON storage.objects FOR DELETE
+  USING ( bucket_id = 'photos' AND auth.uid() = owner );
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()

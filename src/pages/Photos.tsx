@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Photo, Folder } from '../types';
-import { Image as ImageIcon, UploadCloud, Trash2, Download, ExternalLink } from 'lucide-react';
+import { Image as ImageIcon, UploadCloud, Trash2, ExternalLink } from 'lucide-react';
 
 export const Photos: React.FC = () => {
   const { user } = useAuth();
@@ -29,7 +29,17 @@ export const Photos: React.FC = () => {
     let query = supabase.from('photos').select('*').eq('user_id', user.id).order('uploaded_at', { ascending: false });
     if (selectedFolder) query = query.eq('folder_id', selectedFolder);
     const { data } = await query;
-    if (data) setPhotos(data);
+    if (data) {
+      // Get signed URLs for each photo
+      const photosWithUrls = await Promise.all(data.map(async (p: any) => {
+        if (p.storage_path) {
+          const { data: signedUrlData } = await supabase.storage.from('photos').createSignedUrl(p.storage_path, 60 * 60);
+          return { ...p, file_url: signedUrlData?.signedUrl || p.file_url };
+        }
+        return p;
+      }));
+      setPhotos(photosWithUrls);
+    }
   };
 
   useEffect(() => {
@@ -45,61 +55,59 @@ export const Photos: React.FC = () => {
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('user_id', user.id);
-        if (selectedFolder) {
-            formData.append('folder_id', selectedFolder);
-            // Optionally append folder_name if needed by backend
-        }
-
+        
         try {
-            // Simulated progress because standard fetch doesn't support progress easily without XHR
-            const progressInterval = setInterval(() => {
-                setUploadProgress(p => Math.min(p + 10, 90));
-            }, 500);
+            console.log("UPLOAD_START", file.name);
+            setUploadProgress(10);
+            
+            // Upload to Supabase Storage
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+            const storagePath = `${user.id}/${fileName}`;
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('photos')
+              .upload(storagePath, file, {
+                upsert: false
+              });
+              
+            if (uploadError) {
+              console.error("UPLOAD_ERROR", uploadError);
+              throw uploadError;
+            }
+            
+            console.log("UPLOAD_SUCCESS", uploadData);
+            setUploadProgress(60);
+            
+            // Generate signed URL
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('photos').createSignedUrl(storagePath, 60 * 60);
 
-            // Need to point to dynamic API url due to AI Studio env
-            const API_URL = import.meta.env.VITE_APP_URL || '';
-            const res = await fetch(`${API_URL}/api/upload`, {
-                method: 'POST',
-                body: formData
+            if (signedUrlError) {
+              console.error("SIGNED_URL_ERROR", signedUrlError);
+            } else {
+              console.log("SIGNED_URL_SUCCESS", signedUrlData);
+            }
+
+            // Insert metadata into Supabase
+            const { data: dbData, error: dbError } = await supabase.from('photos').insert({
+                user_id: user.id,
+                folder_id: selectedFolder || null,
+                file_name: file.name,
+                storage_path: storagePath,
+                file_url: signedUrlData?.signedUrl || ''
             });
 
-            clearInterval(progressInterval);
+            if (dbError) {
+              console.error("PHOTO_DB_INSERT_ERROR", dbError);
+              throw dbError;
+            }
+            
+            console.log("PHOTO_DB_INSERT_SUCCESS", dbData);
             setUploadProgress(100);
 
-            if (!res.ok) {
-                let errMessage = 'Upload failed';
-                try {
-                    const err = await res.json();
-                    errMessage = err.error || errMessage;
-                } catch(e) {
-                    errMessage = `Server error ${res.status}. Response was not JSON.`;
-                }
-                alert(errMessage);
-            } else {
-                const uploadData = await res.json();
-                
-                if (!uploadData.photo) {
-                    // Fallback: Insert metadata into Supabase from frontend if backend didn't
-                    const { error: dbError } = await supabase.from('photos').insert({
-                        user_id: user.id,
-                        folder_id: selectedFolder || null,
-                        file_name: uploadData.file_name,
-                        drive_file_id: uploadData.drive_file_id,
-                        file_url: uploadData.file_url
-                    });
-    
-                    if (dbError) {
-                        console.error("Database insert error:", dbError);
-                        alert("Upload to Drive succeeded, but saving metadata to database failed due to missing RLS permissions.");
-                    }
-                }
-            }
         } catch (error) {
-            console.error("Upload error", error);
-            alert("Upload failed. Are backend Drive credentials configured?");
+            console.error("UPLOAD_ERROR_CAUGHT", error);
+            alert(`Upload failed for ${file.name}.`);
         }
     }
     
@@ -112,21 +120,23 @@ export const Photos: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string, driveFileId: string) => {
+  const handleDelete = async (id: string, storagePath: string) => {
     if(!confirm("Are you sure you want to delete this photo?")) return;
 
-    // Delete from DB first
-    await supabase.from('photos').delete().eq('id', id);
-    
-    // Attempt delete from Drive via backend
     try {
-        const API_URL = import.meta.env.VITE_APP_URL || '';
-        await fetch(`${API_URL}/api/photo/${driveFileId}`, { method: 'DELETE' });
+      // Delete from Storage first
+      if (storagePath) {
+        await supabase.storage.from('photos').remove([storagePath]);
+      }
+      
+      // Delete from DB
+      await supabase.from('photos').delete().eq('id', id);
+      
+      fetchPhotos();
     } catch (e) {
-        console.error("Failed to delete from Drive", e);
+      console.error("Failed to delete", e);
+      alert("Failed to delete photo.");
     }
-
-    fetchPhotos();
   };
 
   return (
@@ -173,17 +183,20 @@ export const Photos: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 overflow-y-auto pb-8">
         {photos.map(photo => (
           <div key={photo.id} className="vault-card overflow-hidden group border border-slate-200">
-            <div className="aspect-[4/3] bg-slate-100 flex items-center justify-center relative">
-                {/* Due to Google Drive privacy, displaying direct images requires specific permissions/headers. Provide icon or implement proxy if needed. */}
-                <ImageIcon size={48} className="text-slate-300" />
+            <div className="aspect-[4/3] bg-slate-100 flex items-center justify-center relative overflow-hidden">
+                {photo.file_url ? (
+                  <img src={photo.file_url} alt={photo.file_name} className="object-cover w-full h-full" referrerPolicy="no-referrer" />
+                ) : (
+                  <ImageIcon size={48} className="text-slate-300" />
+                )}
                 
                 <div className="absolute inset-0 bg-slate-900 bg-opacity-0 group-hover:bg-opacity-60 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 gap-3">
                     {photo.file_url && (
-                      <a href={photo.file_url} target="_blank" rel="noreferrer" className="p-3 bg-white text-slate-800 rounded-xl hover:bg-slate-100 shadow-sm transition-transform hover:scale-105" title="View in Drive">
+                      <a href={photo.file_url} target="_blank" rel="noreferrer" className="p-3 bg-white text-slate-800 rounded-xl hover:bg-slate-100 shadow-sm transition-transform hover:scale-105" title="View Full Image">
                           <ExternalLink size={20} />
                       </a>
                     )}
-                    <button onClick={() => handleDelete(photo.id, photo.drive_file_id)} className="p-3 bg-red-500 text-white rounded-xl hover:bg-red-600 shadow-sm transition-transform hover:scale-105" title="Delete">
+                    <button onClick={() => handleDelete(photo.id, photo.storage_path)} className="p-3 bg-red-500 text-white rounded-xl hover:bg-red-600 shadow-sm transition-transform hover:scale-105" title="Delete">
                         <Trash2 size={20} />
                     </button>
                 </div>
