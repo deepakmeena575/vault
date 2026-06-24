@@ -186,6 +186,32 @@ app.post("/api/profile", async (req, res) => {
   }
 });
 
+// Profile retrieval API
+app.get("/api/profile", async (req, res) => {
+  try {
+    const userId = req.query.id as string;
+    
+    if (!userId) {
+      return res.status(400).json({ error: "Missing user ID" });
+    }
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return res.status(500).json({ error: "Supabase not configured on server" });
+    }
+
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+
+    if (error) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    
+    res.json({ success: true, profile: data });
+  } catch (error: any) {
+    console.error("Profile get error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Unused backend endpoints for profile and admin stats have been removed. 
 // The frontend directly communicates with Supabase, relying on Row Level Security (RLS) for protection.
 

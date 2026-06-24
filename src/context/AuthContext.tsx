@@ -49,19 +49,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-        
-      if (error && error.code === 'PGRST116') {
+      const API_URL = import.meta.env.VITE_APP_URL || '';
+      const res = await fetch(`${API_URL}/api/profile?id=${userId}`);
+      
+      if (res.ok) {
+        const { profile } = await res.json();
+        setProfile(profile);
+      } else {
         // Profile not found, let's try to create one based on auth user data via API
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
-          const API_URL = import.meta.env.VITE_APP_URL || '';
           try {
-            const res = await fetch(`${API_URL}/api/profile`, {
+            const createRes = await fetch(`${API_URL}/api/profile`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -72,8 +71,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: 'user'
               })
             });
-            if (res.ok) {
-              const resData = await res.json();
+            if (createRes.ok) {
+              const resData = await createRes.json();
               if (resData.success && resData.profile) {
                 setProfile(resData.profile);
                 setLoading(false);
@@ -85,8 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       }
-      
-      if (data) setProfile(data as Profile);
     } catch (e) {
       console.error(e);
     } finally {
