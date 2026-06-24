@@ -26,6 +26,7 @@ export const Register: React.FC = () => {
     setLoading(true);
 
     // Requires email confirmation by default if configured in Supabase
+    console.log('SIGNUP_START');
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -42,12 +43,18 @@ export const Register: React.FC = () => {
     if (signUpError) {
       setError(signUpError.message);
     } else {
+      console.log('SIGNUP_SUCCESS');
       // If email confirmation is disabled or we get auto signed in without confirmation
       // However if email confirmation is required, authData.user exists but isn't signed in natively yet.
       // We can insert profile into public.profiles
       if (authData.user) {
          try {
+           console.log('PROFILE_POST_START');
+           console.log('authData.user.id:', authData.user.id);
            const API_URL = import.meta.env.VITE_APP_URL || '';
+           console.log('API_URL value:', API_URL);
+           console.log('fetch URL being called:', `${API_URL}/api/profile`);
+           
            const res = await fetch(`${API_URL}/api/profile`, {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
@@ -60,9 +67,12 @@ export const Register: React.FC = () => {
              })
            });
            
+           console.log('PROFILE_POST_RESPONSE status:', res.status);
+           const responseBody = await res.json();
+           console.log('PROFILE_POST_RESPONSE body:', responseBody);
+
            if (!res.ok) {
-             const errorData = await res.json();
-             console.error("Failed to insert profile via API:", errorData);
+             console.error("Failed to insert profile via API:", responseBody);
            } else {
              console.log("Profile created successfully via API.");
            }

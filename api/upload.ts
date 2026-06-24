@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/server-supabase';
 import { getDriveClient } from '../lib/googleDrive';
 import { Readable } from 'stream';
 import multer from 'multer';
