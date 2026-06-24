@@ -1,4 +1,4 @@
-import { supabase } from '../lib/server-supabase';
+import { supabase } from '../lib/server-supabase.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
