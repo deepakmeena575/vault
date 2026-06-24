@@ -1,4 +1,4 @@
-import app from '../server';
+import app from '../server.js';
 
 export const config = {
   api: {
@@ -18,6 +18,12 @@ export default async function handler(req: any, res: any) {
   }
 
   console.log('[Upload] Start');
+  console.log(`[Upload] original req.url is: ${req.url}`);
+  
+  // Ensure Express matches the route
+  if (!req.url.startsWith('/api/upload')) {
+    req.url = '/api/upload';
+  }
   
   // Hook res.end to log when finished
   const originalEnd = res.end;

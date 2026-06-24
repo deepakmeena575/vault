@@ -61,7 +61,7 @@ export const Photos: React.FC = () => {
 
             // Need to point to dynamic API url due to AI Studio env
             const API_URL = import.meta.env.VITE_APP_URL || '';
-            const res = await fetch(`\${API_URL}/api/upload`, {
+            const res = await fetch(`${API_URL}/api/upload`, {
                 method: 'POST',
                 body: formData
             });
@@ -75,7 +75,7 @@ export const Photos: React.FC = () => {
                     const err = await res.json();
                     errMessage = err.error || errMessage;
                 } catch(e) {
-                    errMessage = `Server error \${res.status}. Response was not JSON.`;
+                    errMessage = `Server error ${res.status}. Response was not JSON.`;
                 }
                 alert(errMessage);
             } else {
@@ -121,7 +121,7 @@ export const Photos: React.FC = () => {
     // Attempt delete from Drive via backend
     try {
         const API_URL = import.meta.env.VITE_APP_URL || '';
-        await fetch(`\${API_URL}/api/photo/\${driveFileId}`, { method: 'DELETE' });
+        await fetch(`${API_URL}/api/photo/${driveFileId}`, { method: 'DELETE' });
     } catch (e) {
         console.error("Failed to delete from Drive", e);
     }
@@ -166,7 +166,7 @@ export const Photos: React.FC = () => {
 
       {uploadProgress > 0 && (
           <div className="w-full bg-slate-200 rounded-full h-2 mb-6 shrink-0 overflow-hidden">
-            <div className="bg-indigo-600 h-full rounded-full transition-all duration-300" style={{ width: `\${uploadProgress}%` }}></div>
+            <div className="bg-indigo-600 h-full rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
           </div>
       )}
 

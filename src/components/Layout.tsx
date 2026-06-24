@@ -56,7 +56,7 @@ export const Layout: React.FC = () => {
       </div>
 
       {/* Sidebar */}
-      <aside className={`\${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-64 bg-white border-r border-slate-200 sticky top-0 md:h-screen z-10 shrink-0`}>
+      <aside className={`${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-64 bg-white border-r border-slate-200 sticky top-0 md:h-screen z-10 shrink-0`}>
         <div className="p-6 hidden md:flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
             <FolderHeart size={24} />

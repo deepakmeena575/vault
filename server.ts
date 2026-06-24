@@ -57,20 +57,23 @@ const upload = multer({ storage: multer.memoryStorage() });
 // 1. Upload API
 app.post("/api/upload", upload.single("file"), async (req, res) => {
   try {
+    console.log('[Upload] Request received in Express');
     const { folder_id, user_id, folder_name } = req.body;
     const file = req.file;
 
     if (!file) {
+      console.log('[Upload] Error: No file provided');
       return res.status(400).json({ error: "No file provided" });
     }
 
     const drive = getDriveClient();
     if (!drive) {
-      console.error("Drive client could not be initialized.");
-      console.error("GOOGLE_SERVICE_ACCOUNT_EMAIL set:", !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
-      console.error("GOOGLE_PRIVATE_KEY set:", !!process.env.GOOGLE_PRIVATE_KEY);
+      console.log('[Upload] Error: Google Drive auth failed');
       return res.status(500).json({ error: "Google Drive is not configured. Please set GOOGLE_PRIVATE_KEY and GOOGLE_SERVICE_ACCOUNT_EMAIL." });
     }
+    
+    console.log('[Upload] Google Drive authentication success');
+    console.log(`[Upload] Upload started for ${file.originalname}`);
 
     let targetDriveFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || process.env.GOOGLE_DRIVE_ROOT_FOLDER; // default root
 
@@ -101,10 +104,11 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
 
     const drive_file_id = driveRes.data.id;
     const file_url = driveRes.data.webViewLink || driveRes.data.webContentLink || '';
-    console.log(`Successfully uploaded ${file.originalname} to Drive. ID: ${drive_file_id}`);
+    console.log(`[Upload] Upload completed. Successfully uploaded ${file.originalname} to Drive. ID: ${drive_file_id}`);
 
     // Save metadata in Supabase backend directly to bypass RLS issues if user hasn't configured them
     if (supabaseUrl && supabaseServiceKey) {
+      console.log('[Upload] Starting Supabase insert');
       const insertData = {
         user_id,
         folder_id: folder_id || null,
@@ -116,15 +120,19 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
       const { data, error } = await supabase.from('photos').insert(insertData).select().single();
       
       if (error) {
-        console.error("Supabase insert error for photo metadata:", error);
+        console.error("[Upload] Error: Supabase insert error for photo metadata:", error);
         return res.status(500).json({ error: "Failed to save metadata to DB: " + error.message });
       }
+      
+      console.log('[Upload] Supabase insert completed');
+      console.log('[Upload] Response sent (Success)');
       return res.json({ photo: data, success: true, file_name: file.originalname, file_url, drive_file_id });
     }
 
+    console.log('[Upload] Response sent (Success - No Supabase)');
     res.json({ drive_file_id, file_url, file_name: file.originalname, success: true });
   } catch (error: any) {
-    console.error("Upload error:", error);
+    console.error("[Upload] Upload error:", error);
     res.status(500).json({ error: error.message || "Upload failed" });
   }
 });
@@ -214,6 +222,23 @@ app.get("/api/profile", async (req, res) => {
 
 // Unused backend endpoints for profile and admin stats have been removed. 
 // The frontend directly communicates with Supabase, relying on Row Level Security (RLS) for protection.
+
+// Catch-all 404 for unhandled API routes
+app.use("/api/*", (req, res) => {
+  res.status(404).json({ success: false, error: "API route not found" });
+});
+
+// Global error handler to prevent HTML responses
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Express global error handler caught:", err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message || "Internal Server Error"
+  });
+});
 
 // --- VITE MIDDLEWARE ---
 async function startServer() {
