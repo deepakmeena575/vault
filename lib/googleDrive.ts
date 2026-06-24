@@ -15,9 +15,15 @@ export function getDriveClient() {
   }
   
   try {
+    const processedKey = privateKey.replace(/\\n/g, '\n').replace(/"/g, '');
+    
+    console.log("PRIVATE_KEY_LENGTH", privateKey.length);
+    console.log("PRIVATE_KEY_HAS_BEGIN", processedKey.includes("-----BEGIN PRIVATE KEY-----"));
+    console.log("PRIVATE_KEY_HAS_END", processedKey.includes("-----END PRIVATE KEY-----"));
+
     const auth = new google.auth.JWT({
       email: serviceAccountEmail,
-      key: privateKey.replace(/\\n/g, '\n'),
+      key: processedKey,
       scopes: ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive'],
     });
     return google.drive({ version: 'v3', auth });
