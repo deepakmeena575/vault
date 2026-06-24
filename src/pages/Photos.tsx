@@ -47,6 +47,7 @@ export const Photos: React.FC = () => {
   }, [selectedFolder]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("UPLOAD_HANDLER_START");
     const files = e.target.files;
     if (!files || files.length === 0 || !user) return;
     
@@ -57,7 +58,11 @@ export const Photos: React.FC = () => {
         const file = files[i];
         
         try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+            const storagePath = `${user.id}/${fileName}`;
             const foldername = storagePath.split('/')[0];
+
             console.log("UPLOAD_START", file.name);
             console.log("DIAGNOSTIC - auth.uid():", user.id);
             console.log("DIAGNOSTIC - storagePath:", storagePath);
@@ -65,10 +70,7 @@ export const Photos: React.FC = () => {
             setUploadProgress(10);
             
             // Upload to Supabase Storage
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-            const storagePath = `${user.id}/${fileName}`;
-            
+            console.log("Awaiting supabase.storage.upload...");
             const { data: uploadData, error: uploadError } = await supabase.storage
               .from('photos')
               .upload(storagePath, file, {
@@ -84,6 +86,7 @@ export const Photos: React.FC = () => {
             setUploadProgress(60);
             
             // Generate signed URL
+            console.log("Awaiting supabase.storage.createSignedUrl...");
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('photos').createSignedUrl(storagePath, 60 * 60);
 
             if (signedUrlError) {
@@ -93,6 +96,7 @@ export const Photos: React.FC = () => {
             }
 
             // Insert metadata into Supabase
+            console.log("Awaiting supabase.from('photos').insert...");
             const { data: dbData, error: dbError } = await supabase.from('photos').insert({
                 user_id: user.id,
                 folder_id: selectedFolder || null,
