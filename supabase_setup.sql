@@ -29,15 +29,17 @@ CREATE POLICY "Users can update own profile."
   USING ( auth.uid() = id );
 
 -- Create photos table
-CREATE TABLE IF NOT EXISTS public.photos (
+DROP TABLE IF EXISTS public.photos CASCADE;
+
+CREATE TABLE public.photos (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
   folder_id uuid,
-  file_name text NOT NULL,
+  file_name text,
   storage_path text,
   file_url text,
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-  uploaded_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+  created_at timestamptz DEFAULT timezone('utc'::text, now()),
+  uploaded_at timestamptz DEFAULT timezone('utc'::text, now())
 );
 
 -- Enable RLS

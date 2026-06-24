@@ -8,7 +8,7 @@ export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState({ 
     totalUsers: 0, 
     totalPhotos: 0, 
-    totalStorageUsed: 'N/A (Drive)', 
+    totalStorageUsed: 'N/A (Supabase)', 
     recentUploads: [] as any[], 
     users: [] as Profile[] 
   });
@@ -30,7 +30,7 @@ export const AdminDashboard: React.FC = () => {
       setStats({
         totalUsers: usersCount || 0,
         totalPhotos: photosCount || 0,
-        totalStorageUsed: 'N/A (Drive)',
+        totalStorageUsed: 'N/A (Supabase)',
         recentUploads: recentPhotos || [],
         users: usersList || []
       });
@@ -76,7 +76,7 @@ export const AdminDashboard: React.FC = () => {
             <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Storage Used</p>
           </div>
           <p className="text-4xl font-extrabold text-slate-900">{stats.totalStorageUsed}</p>
-          <p className="text-xs text-slate-400 mt-2">Storage is managed externally via Google Drive</p>
+          <p className="text-xs text-slate-400 mt-2">Storage is managed via Supabase Storage</p>
         </div>
       </div>
 
@@ -99,7 +99,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 {photo.file_url && (
                   <a href={photo.file_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 shrink-0 ml-2">
-                    View in Drive
+                    View Image
                   </a>
                 )}
               </div>
