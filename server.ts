@@ -273,12 +273,17 @@ app.get("/api/admin/stats", async (req, res) => {
         .createSignedUrls(paths, 3600);
 
       if (!urlError && urlData) {
-        const urlMap = new Map(urlData.map(item => [item.path, item.signedUrl]));
-        recentUploads = recentRaw.map(p => ({
-          ...p,
-          file_url: urlMap.get(p.storage_path) || null,
-          size_mb: getStableSizeNumber(p.id)
-        }));
+        recentUploads = recentRaw.map(p => {
+          const matchedItem = urlData.find(item => 
+            item.path === p.storage_path || 
+            (item.path && p.storage_path && (p.storage_path.endsWith(item.path) || item.path.endsWith(p.storage_path)))
+          );
+          return {
+            ...p,
+            file_url: matchedItem ? matchedItem.signedUrl : null,
+            size_mb: getStableSizeNumber(p.id)
+          };
+        });
       }
     }
 
@@ -318,12 +323,17 @@ app.get("/api/admin/photos", async (req, res) => {
         .createSignedUrls(paths, 3600);
 
       if (!urlError && urlData) {
-        const urlMap = new Map(urlData.map(item => [item.path, item.signedUrl]));
-        resolvedPhotos = resolvedPhotos.map(p => ({
-          ...p,
-          file_url: urlMap.get(p.storage_path) || null,
-          size_mb: getStableSizeNumber(p.id)
-        }));
+        resolvedPhotos = resolvedPhotos.map(p => {
+          const matchedItem = urlData.find(item => 
+            item.path === p.storage_path || 
+            (item.path && p.storage_path && (p.storage_path.endsWith(item.path) || item.path.endsWith(p.storage_path)))
+          );
+          return {
+            ...p,
+            file_url: matchedItem ? matchedItem.signedUrl : null,
+            size_mb: getStableSizeNumber(p.id)
+          };
+        });
       }
     }
 
