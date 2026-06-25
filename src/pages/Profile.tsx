@@ -8,7 +8,6 @@ import {
   LogOut,
   Check,
   AlertCircle,
-  Trash2,
   HardDrive,
   Image as ImageIcon,
   Shield,
@@ -50,7 +49,6 @@ export const Profile: React.FC = () => {
   const [photosCount, setPhotosCount] = useState<number>(0);
   const [storageSize, setStorageSize] = useState<number>(0);
   const [loadingStats, setLoadingStats] = useState<boolean>(true);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -172,50 +170,6 @@ export const Profile: React.FC = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate("/login");
-  };
-
-  const handleDeleteAccount = async () => {
-    if (!user) return;
-    const confirmed = window.confirm(
-      "WARNING: Are you sure you want to permanently delete your secure photos account? This will immediately and irreversibly delete all your profile data, folders, and photos from our secure cloud storage. This action CANNOT be undone.",
-    );
-    if (!confirmed) return;
-
-    const doubleConfirmed = window.confirm(
-      "Please confirm one final time: click OK to permanently delete everything.",
-    );
-    if (!doubleConfirmed) return;
-
-    setIsDeletingAccount(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const response = await fetch("/api/delete-account", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ user_id: user.id }),
-      });
-
-      const resData = await response.json();
-      if (!response.ok || !resData.success) {
-        throw new Error(resData.error || "Failed to delete account");
-      }
-
-      alert(
-        "Your account and all associated secure records have been permanently destroyed.",
-      );
-      await signOut();
-      navigate("/login");
-    } catch (err: any) {
-      console.error("Account deletion failed:", err);
-      alert(`Account deletion failed: ${err.message || "unknown error"}`);
-    } finally {
-      setIsDeletingAccount(false);
-    }
   };
 
   const storageUsedMB = storageSize.toFixed(1);
@@ -421,7 +375,7 @@ export const Profile: React.FC = () => {
               </p>
             </div>
 
-            {/* Actions List (Logout / Delete) */}
+            {/* Actions List (Logout) */}
             <div className="pt-4 space-y-2.5">
               <button
                 onClick={handleSignOut}
@@ -434,24 +388,6 @@ export const Profile: React.FC = () => {
                   </span>
                 </div>
                 <ChevronRight size={14} className="text-slate-400" />
-              </button>
-
-              <button
-                onClick={handleDeleteAccount}
-                disabled={isDeletingAccount}
-                className="w-full flex items-center justify-between p-3.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-100 transition-colors"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Trash2 size={16} className="text-red-500" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-red-700">
-                    {isDeletingAccount
-                      ? "Deleting Records..."
-                      : "Permanently Delete Account"}
-                  </span>
-                </div>
-                <span className="text-[9px] font-bold bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Danger
-                </span>
               </button>
             </div>
           </div>
@@ -597,9 +533,8 @@ export const Profile: React.FC = () => {
                 mathematically impossible.
               </p>
               <p>
-                <strong>Permanent Deletion:</strong> Deleting a photo or closing
-                your account immediately and permanently purges all records from
-                the storage server.
+                <strong>Permanent Deletion:</strong> Deleting a photo immediately
+                and permanently purges all records from the storage server.
               </p>
             </div>
             <button
