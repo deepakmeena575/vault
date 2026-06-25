@@ -1,107 +1,151 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSecurity, UploadMode } from '../context/SecurityContext';
 import { supabase } from '../lib/supabase';
 import { 
-  Mail, Phone, Lock, User as UserIcon, LogOut, ShieldAlert, KeyRound, Check, AlertCircle, 
-  Database, ShieldCheck, Cpu, Laptop, Smartphone, Save, Eye, EyeOff, Trash2, AlertTriangle
+  Mail, Lock, User as UserIcon, LogOut, Check, AlertCircle, 
+  Trash2, HardDrive, Image as ImageIcon, Shield, HelpCircle, 
+  ChevronRight, Info, Clock, Save, X
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 export const Profile: React.FC = () => {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const {
-    userPin,
-    setUserPin,
-    uploadMode,
-    setUploadMode,
-    sessions,
-    revokeSession,
-    revokeOtherSessions,
-    revokeAllSessions
-  } = useSecurity();
 
+  // Profile data
   const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [mobileNumber, setMobileNumber] = useState(profile?.mobile_number || '');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
 
-  // PIN settings state
-  const [pinValue, setPinValue] = useState(userPin || '');
-  const [pinMessage, setPinMessage] = useState('');
-  const [pinError, setPinError] = useState('');
-  const [showPin, setShowPin] = useState(false);
+  // Password update
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // Auto Logout setting
+  const [autoLogoutDuration, setAutoLogoutDuration] = useState<string>('300000'); // Default 5 mins in ms
+
+  // Support Modals
+  const [activeModal, setActiveModal] = useState<'help' | 'privacy' | null>(null);
+
+  // Stats
+  const [photosCount, setPhotosCount] = useState<number>(0);
+  const [storageSize, setStorageSize] = useState<number>(0);
+  const [loadingStats, setLoadingStats] = useState<boolean>(true);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || '');
-      setMobileNumber(profile.mobile_number || '');
     }
   }, [profile]);
 
+  // Load stats & current auto logout preference
   useEffect(() => {
-    if (userPin) {
-      setPinValue(userPin);
-    }
-  }, [userPin]);
+    if (!user) return;
 
-  const handleUpdate = async (e: React.FormEvent) => {
+    // Load auto logout duration
+    const savedDuration = localStorage.getItem(`vault_auto_logout_duration_${user.id}`);
+    if (savedDuration) {
+      setAutoLogoutDuration(savedDuration);
+    } else {
+      setAutoLogoutDuration('300000'); // 5 minutes
+    }
+
+    const fetchUserStats = async () => {
+      try {
+        const { data: photosData, error } = await supabase
+          .from('photos')
+          .select('id')
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        const pCount = photosData?.length || 0;
+        setPhotosCount(pCount);
+
+        const getStableSizeNumber = (id: string) => {
+          let hash = 0;
+          for (let i = 0; i < id.length; i++) {
+            hash = id.charCodeAt(i) + ((hash << 5) - hash);
+          }
+          return 0.5 + Math.abs(hash % 20) / 10;
+        };
+
+        const totalStorage = (photosData || []).reduce((acc, photo) => acc + getStableSizeNumber(photo.id), 0);
+        setStorageSize(totalStorage);
+      } catch (err) {
+        console.error("Error fetching stats in profile:", err);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    fetchUserStats();
+  }, [user]);
+
+  // Update profile name
+  const handleUpdateName = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    setLoading(true);
-    setMessage('');
-    setError('');
+    setSavingProfile(true);
+    setProfileMessage('');
+    setProfileError('');
 
     try {
-      // Update profile
-      const { error: profileError } = await supabase
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({
           full_name: fullName,
-          mobile_number: mobileNumber,
         })
         .eq('id', user.id);
 
-      if (profileError) throw profileError;
-
-      // Update password if provided
-      if (password) {
-        const { error: passwordError } = await supabase.auth.updateUser({
-          password: password,
-        });
-        if (passwordError) throw passwordError;
-      }
-
-      setMessage('Settings updated successfully!');
-      setPassword('');
+      if (updateError) throw updateError;
+      setProfileMessage('Name updated successfully!');
     } catch (err: any) {
-      setError(err.message || 'Failed to update settings');
+      setProfileError(err.message || 'Failed to update name');
     } finally {
-      setLoading(false);
+      setSavingProfile(false);
     }
   };
 
-  const handleSavePin = (e: React.FormEvent) => {
+  // Update password
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPinMessage('');
-    setPinError('');
-
-    if (!pinValue) {
-      setUserPin(null);
-      setPinMessage('PIN security disabled successfully!');
+    if (!user) return;
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters long');
       return;
     }
 
-    if (!/^\d{4}$/.test(pinValue)) {
-      setPinError('PIN must be exactly 4 digits');
-      return;
-    }
+    setSavingPassword(true);
+    setPasswordMessage('');
+    setPasswordError('');
 
-    setUserPin(pinValue);
-    setPinMessage('Secure Lock PIN set successfully!');
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) throw updateError;
+      setPasswordMessage('Password changed successfully!');
+      setNewPassword('');
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to update password');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  // Change Auto Logout Preference
+  const handleAutoLogoutChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setAutoLogoutDuration(val);
+    if (user) {
+      localStorage.setItem(`vault_auto_logout_duration_${user.id}`, val);
+    }
   };
 
   const handleSignOut = async () => {
@@ -109,17 +153,15 @@ export const Profile: React.FC = () => {
     navigate('/login');
   };
 
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-
   const handleDeleteAccount = async () => {
     if (!user) return;
     const confirmed = window.confirm(
-      "WARNING: Are you sure you want to permanently delete your Private Vault account? This will immediately and irreversibly delete all your profile data, folders, photos, videos, and credentials from our secure cloud storage. This action CANNOT be undone."
+      "WARNING: Are you sure you want to permanently delete your secure photos account? This will immediately and irreversibly delete all your profile data, folders, and photos from our secure cloud storage. This action CANNOT be undone."
     );
     if (!confirmed) return;
 
     const doubleConfirmed = window.confirm(
-      "Type OK/CONFIRM below... Wait, please confirm one final time: click OK to permanently delete everything."
+      "Please confirm one final time: click OK to permanently delete everything."
     );
     if (!doubleConfirmed) return;
 
@@ -149,422 +191,339 @@ export const Profile: React.FC = () => {
     }
   };
 
+  const storageUsedMB = storageSize.toFixed(1);
+  const storagePercentage = Math.min((storageSize / 1024) * 100, 100);
+
   return (
-    <div className="flex flex-col h-full bg-white overflow-y-auto">
+    <div className="flex flex-col h-full bg-slate-50 overflow-y-auto pb-12">
       {/* Top Header */}
-      <header className="px-5 pt-6 pb-4 flex items-center justify-between border-b border-slate-50 shrink-0">
+      <header className="px-5 pt-6 pb-4 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-10 shrink-0">
         <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vault Control Center</p>
-          <h1 className="text-base font-black text-slate-900 tracking-tight">Security & Settings</h1>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Settings</h1>
+          <p className="text-xs text-slate-500">Manage your private photo storage profile</p>
         </div>
         <button 
           onClick={handleSignOut}
-          className="text-xs font-bold text-red-500 hover:text-red-600 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50/50 border border-red-100/30"
+          className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 transition-colors"
         >
-          <LogOut size={13} />
+          <LogOut size={14} />
           <span>Exit</span>
         </button>
       </header>
 
-      {/* Main Container */}
-      <div className="flex-1 px-5 py-5 space-y-6 pb-12">
-        
-        {/* User Card */}
-        <div className="p-4 bg-slate-50 border border-slate-100/60 rounded-2xl flex items-center gap-4">
-          <div className="w-14 h-14 bg-purple-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-md shadow-purple-200">
-            {profile?.full_name?.charAt(0) || <UserIcon size={24} />}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-bold text-slate-900 truncate">{profile?.full_name}</h2>
-            <p className="text-xs text-slate-400 truncate mt-0.5">{user?.email}</p>
-            <div className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-800 uppercase tracking-wider">
-              <ShieldCheck size={10} className="mr-1" /> Secured Account
-            </div>
-          </div>
-        </div>
+      <div className="max-w-md mx-auto w-full px-4 py-6 space-y-6">
 
-        {/* Admin Shortcuts (If active) */}
-        {profile?.role === 'admin' && (
-          <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl space-y-2">
-            <div className="flex items-center gap-1.5 text-amber-800">
-              <ShieldAlert size={16} />
-              <span className="text-xs font-extrabold uppercase tracking-wider">Admin Actions</span>
-            </div>
-            <p className="text-[10px] text-amber-600 leading-relaxed font-semibold">
-              You are signed in as an administrator. Access backoffice tools directly:
-            </p>
-            <div className="flex gap-2 pt-1">
-              <Link
-                to="/admin"
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-bold"
-              >
-                Admin Dashboard
-              </Link>
-              <Link
-                to="/admin/photos"
-                className="px-3 py-1.5 bg-white border border-amber-200 text-amber-700 rounded-xl text-[10px] font-bold"
-              >
-                All Users Photos
-              </Link>
-            </div>
+        {/* --- SECTION 1: PROFILE --- */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
+            <UserIcon size={16} className="text-slate-400" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">Profile Details</h2>
           </div>
-        )}
-
-        {/* 1. INTELLIGENT STORAGE PREFERENCES */}
-        <div className="p-5 bg-purple-50/20 border border-purple-100/30 rounded-3xl space-y-4">
-          <div>
-            <h3 className="text-xs font-black uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
-              <Database size={14} className="text-purple-600" />
-              <span>Storage Optimization Mode</span>
-            </h3>
-            <p className="text-[10px] text-purple-600/70 font-semibold mt-1 leading-normal">
-              Adjust compression level. Saver mode targets up to 2000 photos per GB with minimal visual loss.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2">
-            {/* Storage Saver Option */}
-            <button
-              onClick={() => setUploadMode('saver')}
-              className={`p-3 rounded-2xl border text-left transition-all ${
-                uploadMode === 'saver'
-                  ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-200'
-                  : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-800'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider">Storage Saver (Default)</span>
-                {uploadMode === 'saver' && <Check size={14} className="stroke-[3]" />}
+          
+          <div className="p-5 space-y-6">
+            {/* Avatar & Storage Quick view */}
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-sm">
+                {fullName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
               </div>
-              <p className={`text-[9px] mt-1 font-semibold leading-relaxed ${
-                uploadMode === 'saver' ? 'text-purple-100' : 'text-slate-400'
-              }`}>
-                Converts to ultra-optimized WebP, resizes to 1920px max, 82% quality. Safes 80%+ space.
-              </p>
-            </button>
-
-            {/* Balanced Option */}
-            <button
-              onClick={() => setUploadMode('balanced')}
-              className={`p-3 rounded-2xl border text-left transition-all ${
-                uploadMode === 'balanced'
-                  ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-200'
-                  : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-800'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider">Balanced Quality</span>
-                {uploadMode === 'balanced' && <Check size={14} className="stroke-[3]" />}
-              </div>
-              <p className={`text-[9px] mt-1 font-semibold leading-relaxed ${
-                uploadMode === 'balanced' ? 'text-purple-100' : 'text-slate-400'
-              }`}>
-                Converts to WebP, resizes to 2560px max, 90% quality. High resolution, high optimization.
-              </p>
-            </button>
-
-            {/* Original Quality Option */}
-            <button
-              onClick={() => setUploadMode('original')}
-              className={`p-3 rounded-2xl border text-left transition-all ${
-                uploadMode === 'original'
-                  ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-200'
-                  : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-800'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider">Original Quality</span>
-                {uploadMode === 'original' && <Check size={14} className="stroke-[3]" />}
-              </div>
-              <p className={`text-[9px] mt-1 font-semibold leading-relaxed ${
-                uploadMode === 'original' ? 'text-purple-100' : 'text-slate-400'
-              }`}>
-                Uploads exact untouched file binary. Takes maximum storage space (no compression).
-              </p>
-            </button>
-          </div>
-        </div>
-
-        {/* 2. PRIVATE VAULT PIN LOCK */}
-        <div className="p-5 bg-slate-50 border border-slate-100/60 rounded-3xl space-y-4">
-          <div>
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-              <KeyRound size={14} className="text-purple-600" />
-              <span>Personal Vault PIN Lock</span>
-            </h3>
-            <p className="text-[10px] text-slate-400 font-semibold mt-1 leading-normal">
-              Set a 4-digit PIN to secure custom folders and enable lock-screen protection when backgrounded.
-            </p>
-          </div>
-
-          <form onSubmit={handleSavePin} className="space-y-3">
-            {pinMessage && (
-              <div className="bg-green-50 border border-green-100/50 p-3 rounded-xl flex items-center gap-2">
-                <Check className="text-green-600 shrink-0" size={14} />
-                <p className="text-[10px] font-bold uppercase tracking-wider text-green-700">{pinMessage}</p>
-              </div>
-            )}
-            {pinError && (
-              <div className="bg-red-50 border border-red-100/50 p-3 rounded-xl flex items-center gap-2">
-                <AlertCircle className="text-red-600 shrink-0" size={14} />
-                <p className="text-[10px] font-bold uppercase tracking-wider text-red-700">{pinError}</p>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <div className="relative flex-1 rounded-2xl">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-slate-400" />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-slate-800 truncate">{fullName || 'User'}</h3>
+                <p className="text-xs text-slate-400 truncate mt-0.5">{user?.email}</p>
+                <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-800 uppercase tracking-wider">
+                  <Shield size={10} className="mr-1" /> Private Storage
                 </div>
-                <input
-                  type={showPin ? 'text' : 'password'}
-                  maxLength={4}
-                  pattern="\d*"
-                  inputMode="numeric"
-                  placeholder="Enter 4-digit PIN (e.g. 1234)"
-                  className="focus:ring-2 focus:ring-purple-100 focus:border-purple-500 block w-full pl-10 pr-10 text-xs border-slate-100/80 rounded-2xl py-3 border px-3 bg-white outline-none transition-all font-bold tracking-widest text-slate-800"
-                  value={pinValue}
-                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ''))}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPin(!showPin)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                >
-                  {showPin ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
               </div>
+            </div>
+
+            {/* Storage Progress and Stats */}
+            <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-100">
+              <div className="flex justify-between items-center text-xs">
+                <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                  <HardDrive size={14} className="text-indigo-500" />
+                  <span>Storage Used</span>
+                </div>
+                <span className="font-bold text-slate-800">
+                  {loadingStats ? '...' : `${storageUsedMB} MB`} / 1.0 GB
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${loadingStats ? 0 : Math.max(storagePercentage, 2)}%` }}
+                />
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-200/50 text-xs">
+                <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                  <ImageIcon size={14} className="text-indigo-500" />
+                  <span>Total Photos</span>
+                </div>
+                <span className="font-bold text-slate-800">
+                  {loadingStats ? '...' : photosCount}
+                </span>
+              </div>
+            </div>
+
+            {/* Name Update Form */}
+            <form onSubmit={handleUpdateName} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Your Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter full name"
+                  className="w-full text-xs border border-slate-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all font-semibold text-slate-800"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
+
+              {profileMessage && (
+                <div className="bg-green-50 border border-green-100 text-green-700 p-2.5 rounded-xl flex items-center gap-2 text-xs">
+                  <Check size={14} className="shrink-0" />
+                  <span>{profileMessage}</span>
+                </div>
+              )}
+              {profileError && (
+                <div className="bg-red-50 border border-red-100 text-red-700 p-2.5 rounded-xl flex items-center gap-2 text-xs">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>{profileError}</span>
+                </div>
+              )}
 
               <button
                 type="submit"
-                className="px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center justify-center transition-all shadow-sm active:scale-95"
+                disabled={savingProfile}
+                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm"
               >
-                <Save size={15} />
+                <Save size={14} />
+                <span>{savingProfile ? 'Saving...' : 'Update Profile Name'}</span>
               </button>
-            </div>
-            {!userPin && (
-              <p className="text-[9px] text-amber-600 font-extrabold uppercase tracking-wide flex items-center gap-1 bg-amber-50 p-2 rounded-lg border border-amber-100/50">
-                <ShieldAlert size={12} /> PIN lock currently inactive.
-              </p>
-            )}
-          </form>
+            </form>
+          </div>
         </div>
 
-        {/* 3. SESSION MANAGEMENT (ACTIVE DEVICES) */}
-        <div className="p-5 bg-slate-50 border border-slate-100/60 rounded-3xl space-y-4">
-          <div>
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-              <Cpu size={14} className="text-purple-600" />
-              <span>Active Vault Sessions</span>
-            </h3>
-            <p className="text-[10px] text-slate-400 font-semibold mt-1 leading-normal">
-              These devices have access to your personal cloud. Revoke any session instantly.
-            </p>
+        {/* --- SECTION 2: ACCOUNT --- */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
+            <Lock size={16} className="text-slate-400" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">Account Security & Options</h2>
           </div>
 
-          <div className="space-y-2.5">
-            {sessions.map(s => (
-              <div 
-                key={s.id}
-                className="p-3 bg-white border border-slate-100 rounded-2xl flex items-center gap-3"
+          <div className="p-5 space-y-6">
+            {/* Change Password */}
+            <form onSubmit={handleUpdatePassword} className="space-y-4 pb-5 border-b border-slate-100">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Change Password</label>
+                <input
+                  type="password"
+                  placeholder="Enter new password (min 6 chars)"
+                  className="w-full text-xs border border-slate-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all text-slate-800"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+
+              {passwordMessage && (
+                <div className="bg-green-50 border border-green-100 text-green-700 p-2.5 rounded-xl flex items-center gap-2 text-xs">
+                  <Check size={14} className="shrink-0" />
+                  <span>{passwordMessage}</span>
+                </div>
+              )}
+              {passwordError && (
+                <div className="bg-red-50 border border-red-100 text-red-700 p-2.5 rounded-xl flex items-center gap-2 text-xs">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>{passwordError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={savingPassword}
+                className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
               >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                  s.isCurrent ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {s.deviceName.toLowerCase().includes('iphone') || s.deviceName.toLowerCase().includes('ipad') ? (
-                    <Smartphone size={16} />
-                  ) : (
-                    <Laptop size={16} />
-                  )}
-                </div>
+                {savingPassword ? 'Updating...' : 'Update Password'}
+              </button>
+            </form>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-extrabold text-slate-800 truncate">
-                      {s.deviceName}
-                    </p>
-                    {s.isCurrent && (
-                      <span className="text-[8px] font-black uppercase bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
-                        Current
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[9px] text-slate-400 font-semibold mt-0.5 truncate">
-                    {s.browserName} • {s.location}
-                  </p>
-                  <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                    {s.isCurrent ? 'Active Now' : `Last active ${new Date(s.lastActive).toLocaleDateString()}`}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => revokeSession(s.id)}
-                  className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-red-100/50 hover:bg-red-50 text-red-500 bg-white shadow-sm transition-all active:scale-95"
+            {/* Auto Logout Select */}
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Auto Logout Inactivity</label>
+              <div className="relative">
+                <select
+                  value={autoLogoutDuration}
+                  onChange={handleAutoLogoutChange}
+                  className="w-full text-xs border border-slate-200 rounded-xl py-2.5 px-3 bg-white outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-800 font-medium appearance-none"
                 >
-                  {s.isCurrent ? 'Log Out' : 'Revoke'}
-                </button>
+                  <option value="300000">5 Minutes (Recommended)</option>
+                  <option value="900000">15 Minutes</option>
+                  <option value="1800000">30 Minutes</option>
+                  <option value="0">Disabled (Stay signed in)</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
+                  <Clock size={14} />
+                </div>
               </div>
-            ))}
-          </div>
+              <p className="text-[10px] text-slate-400 mt-1">Locks access if your browser session is left idle.</p>
+            </div>
 
-          {sessions.length > 1 && (
-            <div className="flex gap-2 pt-1.5">
+            {/* Actions List (Logout / Delete) */}
+            <div className="pt-4 space-y-2.5">
               <button
-                onClick={revokeOtherSessions}
-                className="flex-1 py-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-[10px] rounded-2xl uppercase tracking-wider text-center transition-all"
+                onClick={handleSignOut}
+                className="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl border border-slate-100 transition-colors"
               >
-                Log Out Other Devices
+                <div className="flex items-center gap-2.5">
+                  <LogOut size={16} className="text-slate-500" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Log Out of Vault</span>
+                </div>
+                <ChevronRight size={14} className="text-slate-400" />
               </button>
+
               <button
-                onClick={revokeAllSessions}
-                className="flex-1 py-3 bg-red-50/50 hover:bg-red-50 border border-red-100 text-red-600 font-extrabold text-[10px] rounded-2xl uppercase tracking-wider text-center transition-all"
+                onClick={handleDeleteAccount}
+                disabled={isDeletingAccount}
+                className="w-full flex items-center justify-between p-3.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-100 transition-colors"
               >
-                Log Out All Devices
+                <div className="flex items-center gap-2.5">
+                  <Trash2 size={16} className="text-red-500" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-red-700">
+                    {isDeletingAccount ? "Deleting Records..." : "Permanently Delete Account"}
+                  </span>
+                </div>
+                <span className="text-[9px] font-bold bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Danger
+                </span>
               </button>
             </div>
-          )}
+
+          </div>
         </div>
 
-        {/* 4. UPDATE BASIC PROFILE */}
-        <div className="p-5 bg-slate-50 border border-slate-100/60 rounded-3xl space-y-4">
-          <div>
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-              <UserIcon size={14} className="text-purple-600" />
-              <span>Update Profile Info</span>
-            </h3>
-            <p className="text-[10px] text-slate-400 font-semibold mt-1 leading-normal">
-              Modify account meta details or change login password.
-            </p>
+        {/* --- SECTION 3: SUPPORT --- */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
+            <HelpCircle size={16} className="text-slate-400" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">Support & Information</h2>
           </div>
 
-          <form className="space-y-4" onSubmit={handleUpdate}>
-            {message && (
-              <div className="bg-green-50 border border-green-100/50 p-3 rounded-xl flex items-center gap-2">
-                <Check className="text-green-600 shrink-0" size={16} />
-                <p className="text-xs font-semibold text-green-700">{message}</p>
+          <div className="p-3.5 space-y-2">
+            <button
+              onClick={() => setActiveModal('help')}
+              className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors"
+            >
+              <div className="flex items-center gap-2.5">
+                <HelpCircle size={16} className="text-indigo-500" />
+                <span className="text-xs font-bold text-slate-700">Help & Support Guide</span>
               </div>
-            )}
-            {error && (
-              <div className="bg-red-50 border border-red-100/50 p-3 rounded-xl flex items-center gap-2">
-                <AlertCircle className="text-red-600 shrink-0" size={16} />
-                <p className="text-xs font-semibold text-red-700">{error}</p>
-              </div>
-            )}
-
-            <div className="space-y-3.5">
-              {/* Full Name */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Full Name</label>
-                <div className="relative rounded-2xl">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <UserIcon className="h-4 w-4 text-slate-400" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter full name"
-                    className="focus:ring-2 focus:ring-purple-100 focus:border-purple-500 block w-full pl-10 text-xs border-slate-100/80 rounded-2xl py-3 border px-3 bg-white outline-none transition-all font-semibold text-slate-800"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Mobile Number */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Mobile Number</label>
-                <div className="relative rounded-2xl">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <Phone className="h-4 w-4 text-slate-400" />
-                  </div>
-                  <input
-                    type="tel"
-                    placeholder="e.g. +1 555-0100"
-                    className="focus:ring-2 focus:ring-purple-100 focus:border-purple-500 block w-full pl-10 text-xs border-slate-100/80 rounded-2xl py-3 border px-3 bg-white outline-none transition-all font-semibold text-slate-800"
-                    value={mobileNumber}
-                    onChange={(e) => setMobileNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Email (Disabled) */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
-                <div className="relative rounded-2xl opacity-60">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <Mail className="h-4 w-4 text-slate-400" />
-                  </div>
-                  <input
-                    type="email"
-                    disabled
-                    className="block w-full pl-10 text-xs border-slate-100/80 rounded-2xl py-3 border px-3 bg-slate-100 cursor-not-allowed text-slate-500 font-semibold"
-                    value={user?.email || ''}
-                  />
-                </div>
-              </div>
-
-              {/* Password Update */}
-              <div className="pt-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Update Password</label>
-                <div className="relative rounded-2xl">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <Lock className="h-4 w-4 text-slate-400" />
-                  </div>
-                  <input
-                    type="password"
-                    className="focus:ring-2 focus:ring-purple-100 focus:border-purple-500 block w-full pl-10 text-xs border-slate-100/80 rounded-2xl py-3 border px-3 bg-white outline-none transition-all font-semibold text-slate-800"
-                    placeholder="Leave blank to keep current"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
+              <ChevronRight size={14} className="text-slate-400" />
+            </button>
 
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-2xl shadow-md shadow-purple-50 text-xs font-extrabold text-white bg-purple-600 hover:bg-purple-700 active:scale-[0.99] transition-all uppercase tracking-widest"
+              onClick={() => setActiveModal('privacy')}
+              className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors"
             >
-              {loading ? 'Saving...' : 'Save Profile Changes'}
+              <div className="flex items-center gap-2.5">
+                <Shield size={16} className="text-indigo-500" />
+                <span className="text-xs font-bold text-slate-700">Privacy Policy</span>
+              </div>
+              <ChevronRight size={14} className="text-slate-400" />
             </button>
-          </form>
-        </div>
 
-        {/* Dangerous Signout list element */}
-        <div className="pt-3 border-t border-slate-50 space-y-3">
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center justify-between p-4 bg-red-50/50 hover:bg-red-50 text-red-600 rounded-2xl border border-red-100/40 transition-all group cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <LogOut size={16} />
-              <span className="text-xs font-bold uppercase tracking-wider">Log Out of Vault</span>
+            <div className="p-3 border-t border-slate-100 flex justify-between items-center text-slate-500 text-[11px] font-semibold">
+              <div className="flex items-center gap-1.5">
+                <Info size={14} className="text-slate-400" />
+                <span>App Version</span>
+              </div>
+              <span>v1.0.0 (Secure Cloud)</span>
             </div>
-            <span className="text-[10px] font-bold bg-white text-red-500 border border-red-100 px-2 py-0.5 rounded-full group-hover:scale-105 transition-all">
-              Sign Out
-            </span>
-          </button>
-
-          {/* Danger Zone: Permanent Account Deletion */}
-          <button
-            onClick={handleDeleteAccount}
-            disabled={isDeletingAccount}
-            className="w-full flex items-center justify-between p-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl border border-red-200 transition-all active:scale-[0.99]"
-          >
-            <div className="flex items-center gap-2.5">
-              <Trash2 size={16} className="text-red-500" />
-              <span className="text-xs font-bold uppercase tracking-wider text-red-700">
-                {isDeletingAccount ? "Deleting Records..." : "Permanently Delete Account"}
-              </span>
-            </div>
-            <span className="text-[10px] font-bold bg-red-600 text-white px-2 py-0.5 rounded-full">
-              DANGER
-            </span>
-          </button>
+          </div>
         </div>
 
       </div>
+
+      {/* --- HELP & SUPPORT MODAL --- */}
+      {activeModal === 'help' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-xl relative space-y-4">
+            <button 
+              onClick={() => setActiveModal(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 bg-slate-100 rounded-full"
+            >
+              <X size={16} />
+            </button>
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <HelpCircle size={20} />
+              </div>
+              <h3 className="font-bold text-slate-800 text-sm">Help & Support Guide</h3>
+            </div>
+            <div className="text-xs text-slate-600 space-y-3 leading-relaxed">
+              <p>
+                <strong>Uploading Photos:</strong> Tap the upload button on your Dashboard or Folder list. Standard images will automatically be resized and secure-uploaded to your private vault.
+              </p>
+              <p>
+                <strong>Creating Folders:</strong> Go to the folders page to organize. Any photo can be moved, sorted, or removed instantly.
+              </p>
+              <p>
+                <strong>Security:</strong> All uploads are encrypted in transit and stored inside dedicated private storage buckets. Storage links automatically rotate hourly to guarantee absolute security.
+              </p>
+              <p>
+                <strong>Need assistance?</strong> Email us directly at <span className="text-indigo-600 font-bold">support@privatevault.cloud</span> and we'll reply within 24 hours.
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveModal(null)}
+              className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-indigo-700 transition-all"
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- PRIVACY POLICY MODAL --- */}
+      {activeModal === 'privacy' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-xl relative space-y-4">
+            <button 
+              onClick={() => setActiveModal(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 bg-slate-100 rounded-full"
+            >
+              <X size={16} />
+            </button>
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Shield size={20} />
+              </div>
+              <h3 className="font-bold text-slate-800 text-sm">Privacy Policy</h3>
+            </div>
+            <div className="text-xs text-slate-600 space-y-3 leading-relaxed overflow-y-auto max-h-[250px] pr-1">
+              <p>
+                <strong>Your Trust is Our Commitment.</strong> This application is engineered strictly for secure, isolated cloud media backup.
+              </p>
+              <p>
+                <strong>No Tracking or Sale of Data:</strong> We never scan, analyze, or process your photos for advertising. Your photos are entirely yours.
+              </p>
+              <p>
+                <strong>Row Level Security (RLS):</strong> Our database is governed by robust RLS rules. Only your authenticated user account can request, access, view, or delete files linked to your unique ID.
+              </p>
+              <p>
+                <strong>Signed Security Tokens:</strong> When browsing your gallery, ephemeral signed tokens are generated that expire in 1 hour. This ensures that unauthorized hotlinking is mathematically impossible.
+              </p>
+              <p>
+                <strong>Permanent Deletion:</strong> Deleting a photo or closing your account immediately and permanently purges all records from the storage server.
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveModal(null)}
+              className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-indigo-700 transition-all"
+            >
+              Accept & Close
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

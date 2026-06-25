@@ -46,6 +46,7 @@ const folderCoverCache = new Map<string, string>();
 interface UploadQueueItem {
   id: string;
   fileName: string;
+  file: File;
   status: 'pending' | 'compressing' | 'uploading' | 'saving' | 'success' | 'failed' | 'duplicate' | 'invalid_type' | 'too_large';
   progress: number;
 }
@@ -216,6 +217,51 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
 
   // Lazy loading Intersection Observer Target
   const observerTarget = useRef<HTMLDivElement>(null);
+
+  // Mobile pull-to-refresh states & refs
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const startY = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    if (!el || el.scrollTop !== 0) return;
+    startY.current = e.touches[0].clientY;
+    setIsPulling(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isPulling) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - startY.current;
+    if (diff > 0) {
+      const distance = Math.min(diff * 0.4, 80);
+      setPullDistance(distance);
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (!isPulling) return;
+    setIsPulling(false);
+    if (pullDistance > 55) {
+      setRefreshing(true);
+      setPullDistance(35);
+      try {
+        await fetchPhotos(true);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setRefreshing(false);
+        setPullDistance(0);
+      }
+    } else {
+      setPullDistance(0);
+    }
+  };
 
   // Alert system for robust user feedback
   const [alert, setAlert] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
@@ -514,6 +560,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
     const newQueueItems: UploadQueueItem[] = Array.from(files).map((f: any, idx) => ({
       id: `${Date.now()}-${idx}`,
       fileName: f.name,
+      file: f,
       status: 'pending',
       progress: 0,
     }));
@@ -620,6 +667,16 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
     }
   };
 
+  const handleRetryFailedUploads = () => {
+    const failedItems = uploadQueue.filter(item => item.status === 'failed');
+    if (failedItems.length === 0) return;
+    
+    const filesToRetry = failedItems.map(item => item.file);
+    // Clear failed items from current queue
+    setUploadQueue(prev => prev.filter(item => item.status !== 'failed'));
+    uploadFilesBatch(filesToRetry);
+  };
+
   const uploadFilesBatchWithTargetFolder = async (files: File[], targetFolderId: string) => {
     if (!files || files.length === 0 || !user) return;
 
@@ -629,6 +686,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
     const newQueueItems: UploadQueueItem[] = files.map((f, idx) => ({
       id: `${Date.now()}-${idx}`,
       fileName: f.name,
+      file: f,
       status: 'pending',
       progress: 0,
     }));
@@ -1341,8 +1399,29 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
       )}
 
       {/* 2. MAIN SCROLLABLE WRAPPER */}
-      <div className="flex-1 overflow-y-auto px-4 pb-12">
+      <div 
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="flex-1 overflow-y-auto px-4 pb-12 relative"
+      >
         
+        {/* Pull-To-Refresh Visual Indicator */}
+        {pullDistance > 0 && (
+          <div 
+            className="flex items-center justify-center transition-all duration-75 overflow-hidden shrink-0 mb-3 mt-1.5"
+            style={{ height: `${pullDistance}px`, opacity: Math.min(pullDistance / 35, 1) }}
+          >
+            <div className="bg-slate-900/95 text-white shadow-xl px-3.5 py-1.5 rounded-full flex items-center justify-center gap-2 border border-white/10 backdrop-blur-sm">
+              <Loader2 className={`text-purple-400 ${refreshing || pullDistance >= 55 ? 'animate-spin' : ''}`} size={14} />
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-100">
+                {refreshing ? 'Refreshing Vault...' : pullDistance >= 55 ? 'Release to Sync' : 'Pull to Refresh'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Background active upload progression toast */}
         {uploadQueue.length > 0 && (() => {
           const completedCount = uploadQueue.filter(q => ['success', 'failed', 'duplicate', 'invalid_type', 'too_large'].includes(q.status)).length;
@@ -1376,14 +1455,21 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
                   {toastMessage}
                 </span>
               </div>
-              {!isFinished && (
+              {isFinished && failVal > 0 ? (
+                <button
+                  onClick={handleRetryFailedUploads}
+                  className="px-2.5 py-1 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-[9px] font-black uppercase tracking-wider rounded-lg transition-all"
+                >
+                  Retry Failed
+                </button>
+              ) : !isFinished ? (
                 <div className="w-16 bg-slate-800 h-1 rounded-full overflow-hidden">
                   <div 
                     className="bg-purple-500 h-full transition-all duration-300"
                     style={{ width: `${Math.round((completedCount / totalCount) * 100)}%` }}
                   ></div>
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })()}
@@ -1392,6 +1478,18 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
         {activeTab === 'albums' && !selectedFolder && (
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-4">
+              {/* Creator Card */}
+              <div 
+                onClick={() => setShowNewFolderModal(true)}
+                className="bg-purple-50/40 rounded-2xl overflow-hidden border border-dashed border-purple-200 shadow-sm active:scale-[0.98] transition-all cursor-pointer flex flex-col items-center justify-center aspect-square text-center p-4 hover:bg-purple-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 mb-2">
+                  <FolderPlus size={18} />
+                </div>
+                <span className="text-xs font-black text-purple-900">Create Album</span>
+                <span className="text-[9px] text-purple-400 mt-0.5 uppercase font-bold tracking-widest">New Folder</span>
+              </div>
+
               {folders.map(folder => {
                 const count = folderCounts[folder.id] || 0;
                 const isEditing = editingFolderId === folder.id;
@@ -1792,110 +1890,26 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
         </div>
       )}
 
-      {/* 4. PRIMARY FLOATING ACTION BUTTON (➕ Upload & Create Sheet Trigger) */}
+      {/* 4. PRIMARY FLOATING ACTION BUTTON (➕ Upload Trigger) */}
       {selectedPhotoIds.length === 0 && (
         <button
-          onClick={() => setShowFABSheet(true)}
+          onClick={() => fileInputRef.current?.click()}
           className="fixed bottom-24 right-5 w-12 h-12 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-full flex items-center justify-center shadow-lg shadow-purple-200 z-30 transition-all cursor-pointer"
+          title="Upload Photos & Videos"
         >
-          <Plus size={22} className="stroke-[3]" />
+          <UploadCloud size={20} className="stroke-[2.5]" />
         </button>
       )}
 
-      {/* 5. FLOATING ACTION SHEET - SLIDE-UP BOTTOM SHEET */}
-      {showFABSheet && (
-        <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px] z-50 flex items-end justify-center animate-in fade-in duration-150">
-          
-          {/* Sheet Backdrop Tapper */}
-          <div className="absolute inset-0" onClick={() => setShowFABSheet(false)}></div>
-
-          {/* Bottom Sheet Box */}
-          <div className="w-full bg-white rounded-t-3xl p-5 relative z-10 shadow-2xl border-t border-slate-100 animate-in slide-in-from-bottom duration-200">
-            {/* Sheet Handle Indicator */}
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5"></div>
-            
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest text-center mb-5 font-bold">Vault Creator Panel</h3>
-            
-            <div className="space-y-3">
-              
-              {/* Option 1: Upload Photos */}
-              <div>
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept="image/jpeg, image/png, image/webp, video/mp4, video/quicktime, video/webm, video/x-matroska, video/avi"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center gap-3.5 p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-2xl transition-all text-left"
-                >
-                  <div className="w-9 h-9 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
-                    <UploadCloud size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 leading-none">Upload Photos & Videos</p>
-                    <p className="text-[10px] text-slate-400 mt-1">Select and compress assets directly into the current view</p>
-                  </div>
-                </button>
-              </div>
-
-              {/* Option 2: Upload Folder */}
-              <div>
-                <input
-                  type="file"
-                  multiple
-                  {...({ webkitdirectory: "", directory: "" } as any)}
-                  className="hidden"
-                  ref={folderInputRef}
-                  onChange={handleFolderUpload}
-                  accept="image/jpeg, image/png, image/webp, video/mp4, video/quicktime, video/webm, video/x-matroska, video/avi"
-                />
-                <button
-                  onClick={() => folderInputRef.current?.click()}
-                  className="w-full flex items-center gap-3.5 p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-2xl transition-all text-left"
-                >
-                  <div className="w-9 h-9 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
-                    <FolderOpen size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 leading-none">Upload Whole Folder</p>
-                    <p className="text-[10px] text-slate-400 mt-1">Upload a full directory; automatically creates folder classification</p>
-                  </div>
-                </button>
-              </div>
-
-              {/* Option 3: Create Private Album */}
-              <button
-                onClick={() => {
-                  setShowFABSheet(false);
-                  setShowNewFolderModal(true);
-                }}
-                className="w-full flex items-center gap-3.5 p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-2xl transition-all text-left"
-              >
-                <div className="w-9 h-9 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
-                  <FolderPlus size={16} />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-800 leading-none">Create Private Album</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Create a private directory album for smart vault categorization</p>
-                </div>
-              </button>
-
-              {/* Dismiss Trigger */}
-              <button
-                onClick={() => setShowFABSheet(false)}
-                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-2xl uppercase tracking-wider text-center mt-2.5 transition-all"
-              >
-                Cancel
-              </button>
-
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Hidden File Input for Single Floating Upload Button */}
+      <input
+        type="file"
+        multiple
+        className="hidden"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept="image/jpeg, image/png, image/webp, video/mp4, video/quicktime, video/webm, video/x-matroska, video/avi"
+      />
 
       {/* 6. CREATE FOLDER POPUP MODAL */}
       {showNewFolderModal && (

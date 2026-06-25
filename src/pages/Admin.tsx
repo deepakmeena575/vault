@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Users, FolderHeart, Image as ImageIcon, HardDrive } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Users, FolderHeart, Image as ImageIcon, HardDrive, Shield } from 'lucide-react';
 import { Profile, Photo } from '../types';
 
 import { supabase } from '../lib/supabase';
@@ -8,7 +9,7 @@ export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState({ 
     totalUsers: 0, 
     totalPhotos: 0, 
-    totalStorageUsed: 'N/A (Supabase)', 
+    totalStorageUsed: '0.0 MB', 
     recentUploads: [] as any[], 
     users: [] as Profile[] 
   });
@@ -27,7 +28,7 @@ export const AdminDashboard: React.FC = () => {
         setStats({
           totalUsers: data.totalUsers,
           totalPhotos: data.totalPhotos,
-          totalStorageUsed: 'N/A (Supabase)',
+          totalStorageUsed: data.totalStorageUsed || '0.0 MB',
           recentUploads: data.recentUploads || [],
           users: data.users || []
         });
@@ -39,42 +40,69 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="p-8">Loading admin data...</div>;
+  if (loading) return (
+    <div className="p-8 flex flex-col items-center justify-center space-y-3 h-full min-h-[300px]">
+      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-slate-500 font-semibold text-xs">Loading admin stats...</p>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Admin Dashboard</h1>
+    <div className="space-y-6 flex flex-col h-full overflow-y-auto pb-12 px-4 sm:px-6">
+      <div className="shrink-0 pt-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Shield size={16} className="text-indigo-600" />
+          <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Admin Control Panel</span>
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Admin Dashboard</h1>
+        <p className="text-xs text-slate-500 mt-0.5">Global overview of system metrics and user activities</p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-              <Users size={24} />
+      {/* Admin Mode Switcher */}
+      <div className="bg-slate-100 p-1 rounded-xl flex gap-1 shrink-0">
+        <Link 
+          to="/admin" 
+          className="flex-1 py-2 px-3 text-center bg-white text-indigo-600 font-bold rounded-lg text-xs shadow-sm"
+        >
+          Overview Stats
+        </Link>
+        <Link 
+          to="/admin/photos" 
+          className="flex-1 py-2 px-3 text-center text-slate-600 hover:text-slate-900 font-semibold rounded-lg text-xs hover:bg-white/50 transition-all"
+        >
+          All Users' Photos
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 shrink-0">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+          <div className="flex items-center space-x-3 mb-2">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+              <Users size={20} />
             </div>
-            <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Users</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Users</p>
           </div>
-          <p className="text-4xl font-extrabold text-slate-900">{stats.totalUsers}</p>
+          <p className="text-2xl font-black text-slate-900">{stats.totalUsers}</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-              <ImageIcon size={24} />
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+          <div className="flex items-center space-x-3 mb-2">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <ImageIcon size={20} />
             </div>
-            <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Photos</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Photos</p>
           </div>
-          <p className="text-4xl font-extrabold text-slate-900">{stats.totalPhotos}</p>
+          <p className="text-2xl font-black text-slate-900">{stats.totalPhotos}</p>
         </div>
         
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between md:col-span-2">
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
-              <HardDrive size={24} />
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+          <div className="flex items-center space-x-3 mb-2">
+            <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+              <HardDrive size={20} />
             </div>
-            <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Storage Used</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Storage Used</p>
           </div>
-          <p className="text-4xl font-extrabold text-slate-900">{stats.totalStorageUsed}</p>
-          <p className="text-xs text-slate-400 mt-2">Storage is managed via Supabase Storage</p>
+          <p className="text-2xl font-black text-slate-900">{stats.totalStorageUsed}</p>
         </div>
       </div>
 

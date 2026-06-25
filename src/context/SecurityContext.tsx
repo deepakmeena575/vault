@@ -193,8 +193,10 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const interval = setInterval(() => {
       const inactiveTime = Date.now() - lastActivity;
       
-      // 5 minutes = 300,000ms
-      if (inactiveTime >= 5 * 60 * 1000) {
+      const savedDuration = localStorage.getItem(`vault_auto_logout_duration_${user.id}`);
+      const timeoutMs = savedDuration ? parseInt(savedDuration, 10) : 5 * 60 * 1000;
+      
+      if (timeoutMs > 0 && inactiveTime >= timeoutMs) {
         if (!showInactivityWarning) {
           setShowInactivityWarning(true);
           setInactivityCountdown(60);

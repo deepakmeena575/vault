@@ -1,11 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Home, Image, Folder, HardDrive, User } from 'lucide-react';
+import { Home, Image, Folder, HardDrive, User, WifiOff } from 'lucide-react';
 
 export const Layout: React.FC = () => {
   const { profile } = useAuth();
   const location = useLocation();
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const navItems = [
     { path: '/dashboard', label: 'Home', icon: Home },
@@ -31,7 +45,14 @@ export const Layout: React.FC = () => {
       <div className="w-full max-w-md sm:max-w-xl md:max-w-2xl bg-white min-h-screen flex flex-col shadow-2xl relative overflow-hidden">
         
         {/* Main Interactive Screen Area */}
-        <main className="flex-1 flex flex-col overflow-hidden pb-[72px] bg-white">
+        <main className="flex-1 flex flex-col overflow-hidden pb-[72px] bg-white relative">
+          {/* Offline Banner Indicator */}
+          {isOffline && (
+            <div className="bg-amber-500 text-white text-[9px] py-1 px-4 text-center font-black uppercase tracking-widest animate-in slide-in-from-top duration-200 sticky top-0 z-50 shrink-0 flex items-center justify-center gap-1.5 shadow-sm border-b border-amber-600/20">
+              <WifiOff size={11} className="stroke-[2.5]" />
+              <span>Offline Connection Mode — Using Local Cache</span>
+            </div>
+          )}
           <Outlet />
         </main>
 
