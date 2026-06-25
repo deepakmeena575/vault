@@ -1,32 +1,32 @@
-import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { Link, useNavigate } from 'react-router-dom';
-import { FolderHeart, Mail, Lock, User, Phone } from 'lucide-react';
+import React, { useState } from "react";
+import { supabase } from "../lib/supabase";
+import { Link, useNavigate } from "react-router-dom";
+import { FolderHeart, Mail, Lock, User, Phone } from "lucide-react";
 
 export const Register: React.FC = () => {
-  const [fullName, setFullName] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [fullName, setFullName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     setLoading(true);
 
     // Requires email confirmation by default if configured in Supabase
-    console.log('SIGNUP_START');
+    console.log("SIGNUP_START");
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -35,57 +35,66 @@ export const Register: React.FC = () => {
         data: {
           full_name: fullName,
           mobile_number: mobileNumber,
-          role: 'user', // Default role
-        }
-      }
+          role: "user", // Default role
+        },
+      },
     });
 
     if (signUpError) {
       setError(signUpError.message);
     } else {
-      console.log('SIGNUP_SUCCESS');
+      console.log("SIGNUP_SUCCESS");
       // If email confirmation is disabled or we get auto signed in without confirmation
       // However if email confirmation is required, authData.user exists but isn't signed in natively yet.
       // We can insert profile into public.profiles
       if (authData.user) {
-         try {
-           console.log('PROFILE_POST_START');
-           console.log('authData.user.id:', authData.user.id);
-           
-           const res = await fetch(`/api/profile`, {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({
-               id: authData.user.id, 
-               full_name: fullName, 
-               mobile_number: mobileNumber, 
-               email: email,
-               role: 'user'
-             })
-           });
-           
-           console.log('PROFILE_POST_RESPONSE status:', res.status);
-           const responseBody = await res.json();
-           console.log('PROFILE_POST_RESPONSE body:', responseBody);
+        try {
+          console.log("PROFILE_POST_START");
+          console.log("authData.user.id:", authData.user.id);
 
-           if (!res.ok) {
-             console.error("Failed to insert profile via API:", responseBody);
-           } else {
-             console.log("Profile created successfully via API.");
-           }
-         } catch(e) {
-           console.error("Failed to call profile creation API", e);
-         }
+          const token =
+            authData.session?.access_token ||
+            (await supabase.auth.getSession()).data.session?.access_token;
+
+          const res = await fetch(`/api/profile`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              id: authData.user.id,
+              full_name: fullName,
+              mobile_number: mobileNumber,
+              email: email,
+              role: "user",
+            }),
+          });
+
+          console.log("PROFILE_POST_RESPONSE status:", res.status);
+          const responseBody = await res.json();
+          console.log("PROFILE_POST_RESPONSE body:", responseBody);
+
+          if (!res.ok) {
+            console.error("Failed to insert profile via API:", responseBody);
+          } else {
+            console.log("Profile created successfully via API.");
+          }
+        } catch (e) {
+          console.error("Failed to call profile creation API", e);
+        }
       }
 
-      setSuccess('Registration successful! Please check your email to verify your account before logging in.');
-      setFullName('');
-      setMobileNumber('');
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
+      setSuccess(
+        "Registration successful! Please check your email to verify your account before logging in.",
+      );
+      setFullName("");
+      setMobileNumber("");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
     }
-    
+
     setLoading(false);
   };
 
@@ -97,8 +106,8 @@ export const Register: React.FC = () => {
             <FolderHeart size={32} />
           </div>
         </div>
-        <h2 className="mt-6 text-center text-4xl font-extrabold tracking-tight">
-          Join Vault.
+        <h2 className="mt-6 text-center text-4xl font-extrabold tracking-tight text-indigo-600">
+          Join PrivateVault
         </h2>
         <p className="mt-2 text-center text-sm text-slate-500 font-medium tracking-wide">
           Create an account to protect your memories
@@ -113,7 +122,7 @@ export const Register: React.FC = () => {
                 <p className="text-sm font-medium text-red-700">{error}</p>
               </div>
             )}
-            
+
             {success && (
               <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded-r-xl">
                 <p className="text-sm font-medium text-green-700">{success}</p>
@@ -121,7 +130,9 @@ export const Register: React.FC = () => {
             )}
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700">Full Name</label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Full Name
+              </label>
               <div className="mt-2 relative rounded-xl shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-slate-400" />
@@ -138,7 +149,9 @@ export const Register: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700">Mobile Number</label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Mobile Number
+              </label>
               <div className="mt-2 relative rounded-xl shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Phone className="h-5 w-5 text-slate-400" />
@@ -155,7 +168,9 @@ export const Register: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700">Email address</label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Email address
+              </label>
               <div className="mt-2 relative rounded-xl shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-400" />
@@ -172,7 +187,9 @@ export const Register: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700">Password</label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Password
+              </label>
               <div className="mt-2 relative rounded-xl shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-400" />
@@ -189,7 +206,9 @@ export const Register: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700">Confirm Password</label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Confirm Password
+              </label>
               <div className="mt-2 relative rounded-xl shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-400" />
@@ -211,7 +230,7 @@ export const Register: React.FC = () => {
                 disabled={loading}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-200 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors uppercase tracking-wider"
               >
-                {loading ? 'Creating account...' : 'Register'}
+                {loading ? "Creating account..." : "Register"}
               </button>
             </div>
           </form>
@@ -222,7 +241,9 @@ export const Register: React.FC = () => {
                 <div className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-slate-400 font-medium">Already have an account?</span>
+                <span className="px-2 bg-white text-slate-400 font-medium">
+                  Already have an account?
+                </span>
               </div>
             </div>
 

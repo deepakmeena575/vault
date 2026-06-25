@@ -39,13 +39,13 @@ export const Login: React.FC = () => {
           .eq('id', session.user.id)
           .single();
         
-        if (profile?.role === 'admin') {
-          navigate('/admin');
+        if (profile?.role === "admin") {
+          navigate("/admin", { replace: true });
         } else {
-          navigate('/photos');
+          navigate("/photos", { replace: true });
         }
       } else {
-        navigate('/photos');
+        navigate("/photos", { replace: true });
       }
     }
   };
@@ -58,8 +58,8 @@ export const Login: React.FC = () => {
             <FolderHeart size={32} />
           </div>
         </div>
-        <h2 className="mt-6 text-center text-4xl font-extrabold tracking-tight">
-          Vault.
+        <h2 className="mt-6 text-center text-4xl font-extrabold tracking-tight text-indigo-600">
+          PrivateVault
         </h2>
         <p className="mt-2 text-center text-sm text-slate-500 font-medium tracking-wide">
           Sign in to access your private memories
@@ -145,7 +145,7 @@ export const Login: React.FC = () => {
                 <div className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-slate-400 font-medium">New to Vault?</span>
+                <span className="px-2 bg-white text-slate-400 font-medium">New to PrivateVault?</span>
               </div>
             </div>
 

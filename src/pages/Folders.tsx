@@ -45,7 +45,7 @@ export const Folders: React.FC = () => {
         <h1 className="text-5xl font-extrabold tracking-tight mb-2">Folders</h1>
       </header>
 
-      <div className="vault-card p-6 mb-10 shrink-0">
+      <div className="privatevault-card p-6 mb-10 shrink-0">
         <form onSubmit={handleCreate} className="flex gap-4">
           <input
             type="text"
@@ -68,7 +68,7 @@ export const Folders: React.FC = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 overflow-y-auto pb-8">
         {folders.map(folder => (
-          <div key={folder.id} className="vault-card p-5 group cursor-pointer hover:border-indigo-300 transition-all flex flex-col items-center relative">
+          <div key={folder.id} className="privatevault-card p-5 group cursor-pointer hover:border-indigo-300 transition-all flex flex-col items-center relative">
             <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 mb-4 group-hover:bg-indigo-100 transition-colors">
               <FolderIcon size={32} />
             </div>

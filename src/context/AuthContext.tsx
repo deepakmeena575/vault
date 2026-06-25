@@ -59,7 +59,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchWithRetry = async (url: string, options?: RequestInit, retries = 3, delay = 1000): Promise<Response> => {
     try {
-      return await fetch(url, options);
+      // Retrieve the current user's JWT access token from Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const secureOptions = { ...options };
+      secureOptions.headers = {
+        ...(options?.headers || {}),
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      } as Record<string, string>;
+
+      return await fetch(url, secureOptions);
     } catch (err) {
       if (retries > 0) {
         console.warn(`Fetch failed for ${url}. Retrying in ${delay}ms... (${retries} retries left)`);

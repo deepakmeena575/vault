@@ -215,7 +215,7 @@ export const Dashboard: React.FC = () => {
             {profile?.full_name?.charAt(0) || <User size={18} />}
           </div>
           <div>
-            <p className="text-[9px] font-black text-purple-600 uppercase tracking-wider">Cloud Personal Vault</p>
+            <p className="text-[9px] font-black text-purple-600 uppercase tracking-wider">PrivateVault</p>
             <h1 className="text-base font-black text-slate-900 tracking-tight">
               Hey, {profile?.full_name?.split(' ')[0] || 'User'}
             </h1>
@@ -253,7 +253,7 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 text-purple-700">
               <HardDrive size={15} />
-              <span className="text-[10px] font-black uppercase tracking-wider">Vault Storage</span>
+              <span className="text-[10px] font-black uppercase tracking-wider">PrivateVault Storage</span>
             </div>
             <span className="text-xs font-black text-purple-800">
               {loading ? '...' : `${storageUsedMB} MB`} <span className="text-slate-400 font-bold">/ 1.0 GB</span>
@@ -340,7 +340,7 @@ export const Dashboard: React.FC = () => {
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center py-12 text-slate-400">
             <Loader2 className="animate-spin text-purple-600 mb-2" size={24} />
-            <p className="text-xs font-medium">Reading vault archives...</p>
+            <p className="text-xs font-medium">Reading PrivateVault archives...</p>
           </div>
         ) : recentPhotos.length > 0 ? (
           <div className="grid grid-cols-3 gap-1">
@@ -386,9 +386,9 @@ export const Dashboard: React.FC = () => {
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-slate-100 text-slate-300 mb-3 shadow-sm">
               <ImageIcon size={20} className="text-purple-400/80" />
             </div>
-            <p className="font-extrabold text-slate-800 text-xs">Your vault is clean</p>
+            <p className="font-extrabold text-slate-800 text-xs">Your PrivateVault is clean</p>
             <p className="text-[10px] text-slate-400 mt-1 max-w-xs font-semibold leading-relaxed">
-              Upload items using the button above to secure them in your Private Cloud Vault today.
+              Upload items using the button above to secure them in your PrivateVault today.
             </p>
           </div>
         )}

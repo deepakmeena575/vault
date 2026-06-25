@@ -1,4 +1,5 @@
 import { supabase } from '../lib/server-supabase.js';
+import { verifyAuth, setSecurityHeaders } from './authMiddleware.js';
 import multer from 'multer';
 
 // Vercel serverless function config to allow multer parsing
@@ -22,17 +23,14 @@ function runMiddleware(req: any, res: any, fn: any) {
 }
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    setSecurityHeaders(res);
+    return res.status(200).end();
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) {
+    return; // Response already handled by verifyAuth
   }
 
   if (req.method !== 'POST') {
@@ -43,19 +41,16 @@ export default async function handler(req: any, res: any) {
     await runMiddleware(req, res, upload.single('file'));
     
     console.log("UPLOAD_START");
-    const { folder_id, user_id } = req.body;
+    const { folder_id } = req.body;
     const file = req.file;
     
-    console.log("UPLOAD_USER_ID", user_id);
+    // Always use the authenticated user's ID
+    const targetUserId = auth.user.id;
+    console.log("UPLOAD_USER_ID", targetUserId);
 
     if (!file) {
       console.log('[Upload] Error: No file provided');
       return res.status(400).json({ error: "No file provided", success: false });
-    }
-    
-    if (!user_id) {
-      console.log('[Upload] Error: No user ID provided');
-      return res.status(400).json({ error: "No user ID provided", success: false });
     }
 
     console.log("FILE_NAME", file.originalname);
@@ -68,7 +63,7 @@ export default async function handler(req: any, res: any) {
 
     const fileExt = file.originalname.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-    const storagePath = `${user_id}/${fileName}`;
+    const storagePath = `${targetUserId}/${fileName}`;
 
     console.log(`[Upload] Uploading to Supabase Storage: ${storagePath}`);
     
@@ -89,7 +84,7 @@ export default async function handler(req: any, res: any) {
     console.log('[Upload] Starting Supabase database insert');
     
     const insertData = {
-      user_id,
+      user_id: targetUserId,
       folder_id: folder_id || null,
       file_name: file.originalname,
       storage_path: storagePath,

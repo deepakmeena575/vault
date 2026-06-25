@@ -97,7 +97,7 @@ export const SecurityOverlays: React.FC = () => {
             
             <h3 className="text-base font-black text-slate-900 tracking-tight">Security Session Expiry</h3>
             <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">
-              Your personal cloud vault has been idle. To protect your private photos, you will be logged out in:
+              Your PrivateVault session has been idle. To protect your private photos, you will be logged out in:
             </p>
             
             <div className="my-5 py-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -133,7 +133,7 @@ export const SecurityOverlays: React.FC = () => {
             <div className="w-14 h-14 bg-purple-600/15 border border-purple-500/20 text-purple-400 rounded-3xl flex items-center justify-center mb-4 shadow-inner">
               <Lock size={24} className="animate-pulse" />
             </div>
-            <h2 className="text-lg font-black text-white tracking-tight">Vault Securely Locked</h2>
+            <h2 className="text-lg font-black text-white tracking-tight">PrivateVault Securely Locked</h2>
             <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">
               Personal Private Cloud
             </p>
@@ -145,7 +145,7 @@ export const SecurityOverlays: React.FC = () => {
               /* Password Re-auth Form */
               <form onSubmit={handlePasswordVerify} className="w-full space-y-4 animate-in fade-in zoom-in-95 duration-150">
                 <p className="text-center text-xs text-slate-400 leading-relaxed font-semibold">
-                  Confirm your private vault account password to restore access:
+                  Confirm your PrivateVault account password to restore access:
                 </p>
                 
                 <div className="space-y-1">
@@ -264,7 +264,7 @@ export const SecurityOverlays: React.FC = () => {
           {/* Secure watermark */}
           <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold tracking-widest uppercase">
             <ShieldCheck size={14} className="text-purple-600" />
-            <span>Encrypted Vault Space</span>
+            <span>Encrypted PrivateVault Space</span>
           </div>
 
         </div>

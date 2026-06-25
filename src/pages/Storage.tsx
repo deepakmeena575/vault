@@ -59,7 +59,7 @@ export const StoragePage: React.FC = () => {
       <header className="px-5 pt-6 pb-4 flex items-center justify-between border-b border-slate-50 shrink-0">
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cloud Space Manager</p>
-          <h1 className="text-base font-black text-slate-900 tracking-tight">Vault Storage</h1>
+          <h1 className="text-base font-black text-slate-900 tracking-tight">PrivateVault Storage</h1>
         </div>
         <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100/30">
           <Database size={15} />
@@ -99,7 +99,7 @@ export const StoragePage: React.FC = () => {
               <p className="text-white text-xs font-black mt-0.5">{remainingMB.toFixed(1)} MB</p>
             </div>
             <div className="text-right">
-              <p className="text-slate-400 font-medium">Vault Health</p>
+              <p className="text-slate-400 font-medium">PrivateVault Health</p>
               <p className="text-green-400 text-xs font-black mt-0.5 flex items-center justify-end gap-1">
                 <ShieldCheck size={11} /> Secured
               </p>
@@ -181,7 +181,7 @@ export const StoragePage: React.FC = () => {
             </div>
             <p className="font-extrabold text-slate-800 text-xs">No Upload History</p>
             <p className="text-[10px] text-slate-400 mt-1 max-w-xs font-semibold leading-relaxed">
-              Your personal cloud vault is empty. Secure private items in the Photos tab to free device space.
+              Your PrivateVault is empty. Secure private items in the Photos tab to free device space.
             </p>
           </div>
         )}

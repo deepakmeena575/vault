@@ -1,5 +1,5 @@
 {
-  "name": "Personal Private Cloud Vault",
+  "name": "PrivateVault",
   "description": "A secure personal cloud vault for private photo storage, organization, storage management, and easy access on any device.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

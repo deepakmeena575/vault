@@ -1,34 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { 
-  Mail, Lock, User as UserIcon, LogOut, Check, AlertCircle, 
-  Trash2, HardDrive, Image as ImageIcon, Shield, HelpCircle, 
-  ChevronRight, Info, Clock, Save, X
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
+import {
+  Mail,
+  Lock,
+  User as UserIcon,
+  LogOut,
+  Check,
+  AlertCircle,
+  Trash2,
+  HardDrive,
+  Image as ImageIcon,
+  Shield,
+  HelpCircle,
+  ChevronRight,
+  Info,
+  Clock,
+  Save,
+  X,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export const Profile: React.FC = () => {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
   // Profile data
-  const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [profileMessage, setProfileMessage] = useState('');
-  const [profileError, setProfileError] = useState('');
+  const [fullName, setFullName] = useState(profile?.full_name || "");
+  const [profileMessage, setProfileMessage] = useState("");
+  const [profileError, setProfileError] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Password update
-  const [newPassword, setNewPassword] = useState('');
-  const [passwordMessage, setPasswordMessage] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
 
   // Auto Logout setting
-  const [autoLogoutDuration, setAutoLogoutDuration] = useState<string>('300000'); // Default 5 mins in ms
+  const [autoLogoutDuration, setAutoLogoutDuration] =
+    useState<string>("300000"); // Default 5 mins in ms
 
   // Support Modals
-  const [activeModal, setActiveModal] = useState<'help' | 'privacy' | null>(null);
+  const [activeModal, setActiveModal] = useState<"help" | "privacy" | null>(
+    null,
+  );
 
   // Stats
   const [photosCount, setPhotosCount] = useState<number>(0);
@@ -38,7 +54,7 @@ export const Profile: React.FC = () => {
 
   useEffect(() => {
     if (profile) {
-      setFullName(profile.full_name || '');
+      setFullName(profile.full_name || "");
     }
   }, [profile]);
 
@@ -47,19 +63,21 @@ export const Profile: React.FC = () => {
     if (!user) return;
 
     // Load auto logout duration
-    const savedDuration = localStorage.getItem(`vault_auto_logout_duration_${user.id}`);
+    const savedDuration = localStorage.getItem(
+      `vault_auto_logout_duration_${user.id}`,
+    );
     if (savedDuration) {
       setAutoLogoutDuration(savedDuration);
     } else {
-      setAutoLogoutDuration('300000'); // 5 minutes
+      setAutoLogoutDuration("300000"); // 5 minutes
     }
 
     const fetchUserStats = async () => {
       try {
         const { data: photosData, error } = await supabase
-          .from('photos')
-          .select('id')
-          .eq('user_id', user.id);
+          .from("photos")
+          .select("id")
+          .eq("user_id", user.id);
 
         if (error) throw error;
 
@@ -74,7 +92,10 @@ export const Profile: React.FC = () => {
           return 0.5 + Math.abs(hash % 20) / 10;
         };
 
-        const totalStorage = (photosData || []).reduce((acc, photo) => acc + getStableSizeNumber(photo.id), 0);
+        const totalStorage = (photosData || []).reduce(
+          (acc, photo) => acc + getStableSizeNumber(photo.id),
+          0,
+        );
         setStorageSize(totalStorage);
       } catch (err) {
         console.error("Error fetching stats in profile:", err);
@@ -91,21 +112,21 @@ export const Profile: React.FC = () => {
     e.preventDefault();
     if (!user) return;
     setSavingProfile(true);
-    setProfileMessage('');
-    setProfileError('');
+    setProfileMessage("");
+    setProfileError("");
 
     try {
       const { error: updateError } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({
           full_name: fullName,
         })
-        .eq('id', user.id);
+        .eq("id", user.id);
 
       if (updateError) throw updateError;
-      setProfileMessage('Name updated successfully!');
+      setProfileMessage("Name updated successfully!");
     } catch (err: any) {
-      setProfileError(err.message || 'Failed to update name');
+      setProfileError(err.message || "Failed to update name");
     } finally {
       setSavingProfile(false);
     }
@@ -116,13 +137,13 @@ export const Profile: React.FC = () => {
     e.preventDefault();
     if (!user) return;
     if (!newPassword || newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters long');
+      setPasswordError("Password must be at least 6 characters long");
       return;
     }
 
     setSavingPassword(true);
-    setPasswordMessage('');
-    setPasswordError('');
+    setPasswordMessage("");
+    setPasswordError("");
 
     try {
       const { error: updateError } = await supabase.auth.updateUser({
@@ -130,10 +151,10 @@ export const Profile: React.FC = () => {
       });
 
       if (updateError) throw updateError;
-      setPasswordMessage('Password changed successfully!');
-      setNewPassword('');
+      setPasswordMessage("Password changed successfully!");
+      setNewPassword("");
     } catch (err: any) {
-      setPasswordError(err.message || 'Failed to update password');
+      setPasswordError(err.message || "Failed to update password");
     } finally {
       setSavingPassword(false);
     }
@@ -150,27 +171,31 @@ export const Profile: React.FC = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login');
+    navigate("/login");
   };
 
   const handleDeleteAccount = async () => {
     if (!user) return;
     const confirmed = window.confirm(
-      "WARNING: Are you sure you want to permanently delete your secure photos account? This will immediately and irreversibly delete all your profile data, folders, and photos from our secure cloud storage. This action CANNOT be undone."
+      "WARNING: Are you sure you want to permanently delete your secure photos account? This will immediately and irreversibly delete all your profile data, folders, and photos from our secure cloud storage. This action CANNOT be undone.",
     );
     if (!confirmed) return;
 
     const doubleConfirmed = window.confirm(
-      "Please confirm one final time: click OK to permanently delete everything."
+      "Please confirm one final time: click OK to permanently delete everything.",
     );
     if (!doubleConfirmed) return;
 
     setIsDeletingAccount(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch("/api/delete-account", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ user_id: user.id }),
       });
@@ -180,12 +205,14 @@ export const Profile: React.FC = () => {
         throw new Error(resData.error || "Failed to delete account");
       }
 
-      alert("Your account and all associated secure records have been permanently destroyed.");
+      alert(
+        "Your account and all associated secure records have been permanently destroyed.",
+      );
       await signOut();
-      navigate('/login');
+      navigate("/login");
     } catch (err: any) {
       console.error("Account deletion failed:", err);
-      alert(`Account deletion failed: ${err.message || 'unknown error'}`);
+      alert(`Account deletion failed: ${err.message || "unknown error"}`);
     } finally {
       setIsDeletingAccount(false);
     }
@@ -199,10 +226,14 @@ export const Profile: React.FC = () => {
       {/* Top Header */}
       <header className="px-5 pt-6 pb-4 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-10 shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Settings</h1>
-          <p className="text-xs text-slate-500">Manage your private photo storage profile</p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            Settings
+          </h1>
+          <p className="text-xs text-slate-500">
+            Manage your private photo storage profile
+          </p>
         </div>
-        <button 
+        <button
           onClick={handleSignOut}
           className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 transition-colors"
         >
@@ -212,23 +243,30 @@ export const Profile: React.FC = () => {
       </header>
 
       <div className="max-w-md mx-auto w-full px-4 py-6 space-y-6">
-
         {/* --- SECTION 1: PROFILE --- */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
             <UserIcon size={16} className="text-slate-400" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">Profile Details</h2>
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
+              Profile Details
+            </h2>
           </div>
-          
+
           <div className="p-5 space-y-6">
             {/* Avatar & Storage Quick view */}
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-sm">
-                {fullName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
+                {fullName?.charAt(0).toUpperCase() ||
+                  user?.email?.charAt(0).toUpperCase() ||
+                  "U"}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-slate-800 truncate">{fullName || 'User'}</h3>
-                <p className="text-xs text-slate-400 truncate mt-0.5">{user?.email}</p>
+                <h3 className="text-sm font-bold text-slate-800 truncate">
+                  {fullName || "User"}
+                </h3>
+                <p className="text-xs text-slate-400 truncate mt-0.5">
+                  {user?.email}
+                </p>
                 <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-800 uppercase tracking-wider">
                   <Shield size={10} className="mr-1" /> Private Storage
                 </div>
@@ -243,13 +281,15 @@ export const Profile: React.FC = () => {
                   <span>Storage Used</span>
                 </div>
                 <span className="font-bold text-slate-800">
-                  {loadingStats ? '...' : `${storageUsedMB} MB`} / 1.0 GB
+                  {loadingStats ? "..." : `${storageUsedMB} MB`} / 1.0 GB
                 </span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                <div 
-                  className="bg-indigo-600 h-full rounded-full transition-all duration-500" 
-                  style={{ width: `${loadingStats ? 0 : Math.max(storagePercentage, 2)}%` }}
+                <div
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${loadingStats ? 0 : Math.max(storagePercentage, 2)}%`,
+                  }}
                 />
               </div>
               <div className="flex justify-between items-center pt-1 border-t border-slate-200/50 text-xs">
@@ -258,7 +298,7 @@ export const Profile: React.FC = () => {
                   <span>Total Photos</span>
                 </div>
                 <span className="font-bold text-slate-800">
-                  {loadingStats ? '...' : photosCount}
+                  {loadingStats ? "..." : photosCount}
                 </span>
               </div>
             </div>
@@ -266,7 +306,9 @@ export const Profile: React.FC = () => {
             {/* Name Update Form */}
             <form onSubmit={handleUpdateName} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Your Name</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Your Name
+                </label>
                 <input
                   type="text"
                   required
@@ -296,7 +338,9 @@ export const Profile: React.FC = () => {
                 className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <Save size={14} />
-                <span>{savingProfile ? 'Saving...' : 'Update Profile Name'}</span>
+                <span>
+                  {savingProfile ? "Saving..." : "Update Profile Name"}
+                </span>
               </button>
             </form>
           </div>
@@ -306,14 +350,21 @@ export const Profile: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
             <Lock size={16} className="text-slate-400" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">Account Security & Options</h2>
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
+              Account Security & Options
+            </h2>
           </div>
 
           <div className="p-5 space-y-6">
             {/* Change Password */}
-            <form onSubmit={handleUpdatePassword} className="space-y-4 pb-5 border-b border-slate-100">
+            <form
+              onSubmit={handleUpdatePassword}
+              className="space-y-4 pb-5 border-b border-slate-100"
+            >
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Change Password</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Change Password
+                </label>
                 <input
                   type="password"
                   placeholder="Enter new password (min 6 chars)"
@@ -341,13 +392,15 @@ export const Profile: React.FC = () => {
                 disabled={savingPassword}
                 className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
               >
-                {savingPassword ? 'Updating...' : 'Update Password'}
+                {savingPassword ? "Updating..." : "Update Password"}
               </button>
             </form>
 
             {/* Auto Logout Select */}
             <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Auto Logout Inactivity</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Auto Logout Inactivity
+              </label>
               <div className="relative">
                 <select
                   value={autoLogoutDuration}
@@ -363,7 +416,9 @@ export const Profile: React.FC = () => {
                   <Clock size={14} />
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 mt-1">Locks access if your browser session is left idle.</p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Locks access if your browser session is left idle.
+              </p>
             </div>
 
             {/* Actions List (Logout / Delete) */}
@@ -374,7 +429,9 @@ export const Profile: React.FC = () => {
               >
                 <div className="flex items-center gap-2.5">
                   <LogOut size={16} className="text-slate-500" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Log Out of Vault</span>
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Log Out of PrivateVault
+                  </span>
                 </div>
                 <ChevronRight size={14} className="text-slate-400" />
               </button>
@@ -387,7 +444,9 @@ export const Profile: React.FC = () => {
                 <div className="flex items-center gap-2.5">
                   <Trash2 size={16} className="text-red-500" />
                   <span className="text-xs font-bold uppercase tracking-wider text-red-700">
-                    {isDeletingAccount ? "Deleting Records..." : "Permanently Delete Account"}
+                    {isDeletingAccount
+                      ? "Deleting Records..."
+                      : "Permanently Delete Account"}
                   </span>
                 </div>
                 <span className="text-[9px] font-bold bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -395,7 +454,6 @@ export const Profile: React.FC = () => {
                 </span>
               </button>
             </div>
-
           </div>
         </div>
 
@@ -403,28 +461,34 @@ export const Profile: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
             <HelpCircle size={16} className="text-slate-400" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">Support & Information</h2>
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
+              Support & Information
+            </h2>
           </div>
 
           <div className="p-3.5 space-y-2">
             <button
-              onClick={() => setActiveModal('help')}
+              onClick={() => setActiveModal("help")}
               className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors"
             >
               <div className="flex items-center gap-2.5">
                 <HelpCircle size={16} className="text-indigo-500" />
-                <span className="text-xs font-bold text-slate-700">Help & Support Guide</span>
+                <span className="text-xs font-bold text-slate-700">
+                  Help & Support Guide
+                </span>
               </div>
               <ChevronRight size={14} className="text-slate-400" />
             </button>
 
             <button
-              onClick={() => setActiveModal('privacy')}
+              onClick={() => setActiveModal("privacy")}
               className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors"
             >
               <div className="flex items-center gap-2.5">
                 <Shield size={16} className="text-indigo-500" />
-                <span className="text-xs font-bold text-slate-700">Privacy Policy</span>
+                <span className="text-xs font-bold text-slate-700">
+                  Privacy Policy
+                </span>
               </div>
               <ChevronRight size={14} className="text-slate-400" />
             </button>
@@ -438,14 +502,13 @@ export const Profile: React.FC = () => {
             </div>
           </div>
         </div>
-
       </div>
 
       {/* --- HELP & SUPPORT MODAL --- */}
-      {activeModal === 'help' && (
+      {activeModal === "help" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-xl relative space-y-4">
-            <button 
+            <button
               onClick={() => setActiveModal(null)}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 bg-slate-100 rounded-full"
             >
@@ -455,20 +518,32 @@ export const Profile: React.FC = () => {
               <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                 <HelpCircle size={20} />
               </div>
-              <h3 className="font-bold text-slate-800 text-sm">Help & Support Guide</h3>
+              <h3 className="font-bold text-slate-800 text-sm">
+                Help & Support Guide
+              </h3>
             </div>
             <div className="text-xs text-slate-600 space-y-3 leading-relaxed">
               <p>
-                <strong>Uploading Photos:</strong> Tap the upload button on your Dashboard or Folder list. Standard images will automatically be resized and secure-uploaded to your private vault.
+                <strong>Uploading Photos:</strong> Tap the upload button on your
+                Dashboard or Folder list. Standard images will automatically be
+                resized and secure-uploaded to your PrivateVault.
               </p>
               <p>
-                <strong>Creating Folders:</strong> Go to the folders page to organize. Any photo can be moved, sorted, or removed instantly.
+                <strong>Creating Folders:</strong> Go to the folders page to
+                organize. Any photo can be moved, sorted, or removed instantly.
               </p>
               <p>
-                <strong>Security:</strong> All uploads are encrypted in transit and stored inside dedicated private storage buckets. Storage links automatically rotate hourly to guarantee absolute security.
+                <strong>Security:</strong> All uploads are encrypted in transit
+                and stored inside dedicated private storage buckets. Storage
+                links automatically rotate hourly to guarantee absolute
+                security.
               </p>
               <p>
-                <strong>Need assistance?</strong> Email us directly at <span className="text-indigo-600 font-bold">support@privatevault.cloud</span> and we'll reply within 24 hours.
+                <strong>Need assistance?</strong> Email us directly at{" "}
+                <span className="text-indigo-600 font-bold">
+                  support@privatevault.cloud
+                </span>{" "}
+                and we'll reply within 24 hours.
               </p>
             </div>
             <button
@@ -482,10 +557,10 @@ export const Profile: React.FC = () => {
       )}
 
       {/* --- PRIVACY POLICY MODAL --- */}
-      {activeModal === 'privacy' && (
+      {activeModal === "privacy" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-xl relative space-y-4">
-            <button 
+            <button
               onClick={() => setActiveModal(null)}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 bg-slate-100 rounded-full"
             >
@@ -495,23 +570,36 @@ export const Profile: React.FC = () => {
               <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                 <Shield size={20} />
               </div>
-              <h3 className="font-bold text-slate-800 text-sm">Privacy Policy</h3>
+              <h3 className="font-bold text-slate-800 text-sm">
+                Privacy Policy
+              </h3>
             </div>
             <div className="text-xs text-slate-600 space-y-3 leading-relaxed overflow-y-auto max-h-[250px] pr-1">
               <p>
-                <strong>Your Trust is Our Commitment.</strong> This application is engineered strictly for secure, isolated cloud media backup.
+                <strong>Your Trust is Our Commitment.</strong> This application
+                is engineered strictly for secure, isolated cloud media backup.
               </p>
               <p>
-                <strong>No Tracking or Sale of Data:</strong> We never scan, analyze, or process your photos for advertising. Your photos are entirely yours.
+                <strong>No Tracking or Sale of Data:</strong> We never scan,
+                analyze, or process your photos for advertising. Your photos are
+                entirely yours.
               </p>
               <p>
-                <strong>Row Level Security (RLS):</strong> Our database is governed by robust RLS rules. Only your authenticated user account can request, access, view, or delete files linked to your unique ID.
+                <strong>Row Level Security (RLS):</strong> Our database is
+                governed by robust RLS rules. Only your authenticated user
+                account can request, access, view, or delete files linked to
+                your unique ID.
               </p>
               <p>
-                <strong>Signed Security Tokens:</strong> When browsing your gallery, ephemeral signed tokens are generated that expire in 1 hour. This ensures that unauthorized hotlinking is mathematically impossible.
+                <strong>Signed Security Tokens:</strong> When browsing your
+                gallery, ephemeral signed tokens are generated that expire in 1
+                hour. This ensures that unauthorized hotlinking is
+                mathematically impossible.
               </p>
               <p>
-                <strong>Permanent Deletion:</strong> Deleting a photo or closing your account immediately and permanently purges all records from the storage server.
+                <strong>Permanent Deletion:</strong> Deleting a photo or closing
+                your account immediately and permanently purges all records from
+                the storage server.
               </p>
             </div>
             <button
@@ -523,7 +611,6 @@ export const Profile: React.FC = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

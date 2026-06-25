@@ -1233,7 +1233,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
                     onClick={() => handleBulkMoveToFolder(null)}
                     className="w-full text-left text-[11px] font-bold text-slate-200 hover:text-white px-3 py-2 rounded-xl hover:bg-white/10 transition-colors uppercase tracking-wide mt-1.5"
                   >
-                    Unclassified Vault
+                    Unclassified PrivateVault
                   </button>
                   {folders.map(f => (
                     <button
@@ -1387,7 +1387,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
                       ? 'Albums & Folders' 
                       : activeTab === 'favorites' 
                         ? 'Starred Favorites' 
-                        : 'Trash Vault'
+                        : 'Trash PrivateVault'
                 }
               </h2>
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
@@ -1416,7 +1416,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
             <div className="bg-slate-900/95 text-white shadow-xl px-3.5 py-1.5 rounded-full flex items-center justify-center gap-2 border border-white/10 backdrop-blur-sm">
               <Loader2 className={`text-purple-400 ${refreshing || pullDistance >= 55 ? 'animate-spin' : ''}`} size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest text-slate-100">
-                {refreshing ? 'Refreshing Vault...' : pullDistance >= 55 ? 'Release to Sync' : 'Pull to Refresh'}
+                {refreshing ? 'Refreshing PrivateVault...' : pullDistance >= 55 ? 'Release to Sync' : 'Pull to Refresh'}
               </span>
             </div>
           </div>
@@ -1764,9 +1764,9 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
                 ) : activeTab === 'trash' ? (
                   <>
                     <Trash2 size={32} className="text-purple-300 mx-auto mb-2" />
-                    <p className="text-slate-800 font-extrabold text-xs">Trash Vault is Empty</p>
+                    <p className="text-slate-800 font-extrabold text-xs">Trash PrivateVault is Empty</p>
                     <p className="text-slate-400 text-[10px] mt-1 font-semibold max-w-xs mx-auto">
-                      No deleted items in your Trash Vault. Deleted items are kept safe here until permanently cleared.
+                      No deleted items in your Trash PrivateVault. Deleted items are kept safe here until permanently cleared.
                     </p>
                   </>
                 ) : selectedFolder ? (
@@ -1774,7 +1774,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
                     <FolderIcon size={32} className="text-purple-300 mx-auto mb-2" />
                     <p className="text-slate-800 font-extrabold text-xs">This Folder is Empty</p>
                     <p className="text-slate-400 text-[10px] mt-1 font-semibold max-w-xs mx-auto">
-                      Move photos here from your Unclassified Vault to keep this folder organized.
+                      Move photos here from your Unclassified PrivateVault to keep this folder organized.
                     </p>
                   </>
                 ) : (
@@ -1835,7 +1835,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
                   onClick={() => handleBulkMoveToFolder(null)}
                   className="w-full text-left text-[9px] font-extrabold text-slate-300 hover:text-white px-2 py-1.5 rounded-lg hover:bg-slate-700 uppercase"
                 >
-                  Unclassified Vault
+                  Unclassified PrivateVault
                 </button>
                 {folders.map(f => (
                   <button
@@ -2066,7 +2066,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
             </div>
 
             <div>
-              <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Personal Cloud Vault</p>
+              <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest">PrivateVault</p>
               <h3 className="text-lg font-black text-white tracking-tight mt-1">
                 Album Directory Secured
               </h3>
@@ -2147,7 +2147,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
             
             <div className="space-y-1.5">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
-                Vault Security PIN Required
+                PrivateVault Security PIN Required
               </h3>
               <p className="text-xs text-slate-500 font-semibold leading-relaxed">
                 You must set up a 4-digit security PIN in your profile settings before you can lock individual photo albums and directories.
