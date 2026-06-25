@@ -232,15 +232,30 @@ app.get("/api/admin/stats", async (req, res) => {
     }
 
     // B. Fetch all photos using service role
-    const { data: photos, error: photosError } = await supabase
+    const { data: rawPhotos, error: photosError } = await supabase
       .from('photos')
-      .select('*, profiles(id, full_name, email), folders(id, folder_name)')
+      .select('*, profiles(id, full_name, email)')
       .order('uploaded_at', { ascending: false });
 
     if (photosError) {
       console.error("[AdminStats] Photos query error:", photosError);
       throw photosError;
     }
+
+    // Fetch folders to map in-memory to prevent schema caching join issues
+    const { data: folders, error: foldersError } = await supabase
+      .from('folders')
+      .select('id, folder_name');
+
+    if (foldersError) {
+      console.warn("[AdminStats] Folders query error (non-blocking):", foldersError);
+    }
+
+    const folderMap = new Map((folders || []).map(f => [f.id, f]));
+    const photos = (rawPhotos || []).map(p => ({
+      ...p,
+      folders: p.folder_id ? folderMap.get(p.folder_id) || null : null
+    }));
 
     const totalUsers = profiles.length;
     const totalPhotos = photos.length;
@@ -305,15 +320,32 @@ app.get("/api/admin/stats", async (req, res) => {
 app.get("/api/admin/photos", async (req, res) => {
   try {
     console.log("[AdminPhotos] Fetching all photos...");
-    const { data: photos, error: photosError } = await supabase
+    const { data: rawPhotos, error: photosError } = await supabase
       .from('photos')
-      .select('*, profiles(id, full_name, email), folders(id, folder_name)')
+      .select('*, profiles(id, full_name, email)')
       .order('uploaded_at', { ascending: false });
 
     if (photosError) {
-      console.error("[AdminPhotos] Photos query error:", photosError);
+      console.error("[AdminPhotos] Database query error fetching photos:", photosError);
       throw photosError;
     }
+
+    // Fetch folders to map in-memory to prevent schema caching join issues
+    const { data: folders, error: foldersError } = await supabase
+      .from('folders')
+      .select('id, folder_name');
+
+    if (foldersError) {
+      console.warn("[AdminPhotos] Folders query error (non-blocking):", foldersError);
+    }
+
+    const folderMap = new Map((folders || []).map(f => [f.id, f]));
+    const photos = (rawPhotos || []).map(p => ({
+      ...p,
+      folders: p.folder_id ? folderMap.get(p.folder_id) || null : null
+    }));
+
+    console.log(`[AdminPhotos] Fetched ${photos?.length || 0} photos successfully. Generating signed URLs...`);
 
     let resolvedPhotos = photos || [];
     const paths = resolvedPhotos.map(p => p.storage_path).filter(Boolean);
@@ -321,6 +353,12 @@ app.get("/api/admin/photos", async (req, res) => {
       const { data: urlData, error: urlError } = await supabase.storage
         .from('photos')
         .createSignedUrls(paths, 3600);
+
+      if (urlError) {
+        console.error("[AdminPhotos] Supabase storage error generating signed URLs:", urlError);
+      } else {
+        console.log(`[AdminPhotos] Successfully generated ${urlData?.length || 0} signed URLs.`);
+      }
 
       if (!urlError && urlData) {
         resolvedPhotos = resolvedPhotos.map(p => {
@@ -345,6 +383,18 @@ app.get("/api/admin/photos", async (req, res) => {
     console.error("[AdminPhotos] Fatal admin photos collection exception:", error);
     res.status(500).json({ error: error.message || "Failed to load admin photos", success: false });
   }
+});
+
+// Admin Configuration Debug Endpoint
+app.get("/api/admin/debug", (req, res) => {
+  res.json({
+    hasUrl: !!supabaseUrl,
+    urlValue: supabaseUrl ? supabaseUrl.substring(0, 15) + "..." : "none",
+    hasServiceKey: !!supabaseServiceKey,
+    serviceKeyLength: supabaseServiceKey ? supabaseServiceKey.length : 0,
+    nodeEnv: process.env.NODE_ENV,
+    isDummyKey: supabaseServiceKey === "dummy" || supabaseServiceKey.includes("YOUR_SERVICE_ROLE_KEY")
+  });
 });
 
 // Catch-all 404 for unhandled API routes
