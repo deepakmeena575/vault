@@ -42,8 +42,43 @@ CREATE TABLE public.photos (
   uploaded_at timestamptz DEFAULT timezone('utc'::text, now())
 );
 
+-- Create folders table
+CREATE TABLE IF NOT EXISTS public.folders (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  folder_name text NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Enable RLS
 ALTER TABLE public.photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.folders ENABLE ROW LEVEL SECURITY;
+
+-- Create indexes for large-scale performance
+CREATE INDEX IF NOT EXISTS idx_photos_user_id ON public.photos(user_id);
+CREATE INDEX IF NOT EXISTS idx_photos_folder_id ON public.photos(folder_id);
+CREATE INDEX IF NOT EXISTS idx_photos_uploaded_at ON public.photos(uploaded_at DESC);
+
+-- Folders RLS policies
+DROP POLICY IF EXISTS "Users can view their own folders" ON public.folders;
+CREATE POLICY "Users can view their own folders"
+  ON public.folders FOR SELECT
+  USING ( auth.uid() = user_id );
+
+DROP POLICY IF EXISTS "Users can insert their own folders" ON public.folders;
+CREATE POLICY "Users can insert their own folders"
+  ON public.folders FOR INSERT
+  WITH CHECK ( auth.uid() = user_id );
+
+DROP POLICY IF EXISTS "Users can update their own folders" ON public.folders;
+CREATE POLICY "Users can update their own folders"
+  ON public.folders FOR UPDATE
+  USING ( auth.uid() = user_id );
+
+DROP POLICY IF EXISTS "Users can delete their own folders" ON public.folders;
+CREATE POLICY "Users can delete their own folders"
+  ON public.folders FOR DELETE
+  USING ( auth.uid() = user_id );
 
 -- Photos RLS policies
 DROP POLICY IF EXISTS "Users can view their own photos" ON public.photos;

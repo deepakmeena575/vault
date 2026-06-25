@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { SecurityProvider } from './context/SecurityContext';
+import { SecurityOverlays } from './components/SecurityOverlays';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -7,10 +9,10 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 
-import { Folders } from './pages/Folders';
 import { Photos } from './pages/Photos';
 
 import { Profile } from './pages/Profile';
+import { StoragePage } from './pages/Storage';
 import { AdminDashboard } from './pages/Admin';
 import { AdminPhotos } from './pages/AdminPhotos';
 
@@ -21,24 +23,32 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/folders" element={<Folders />} />
-            <Route path="/photos" element={<Photos />} />
-            <Route path="/profile" element={<Profile />} />
-          </Route>
+        <SecurityProvider>
+          <SecurityOverlays />
+          <Routes>
+            <Route path="/" element={<Navigate to="/photos" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            
+            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/photos" element={<Photos activeTab="photos" />} />
+              <Route path="/folders" element={<Photos activeTab="albums" />} />
+              <Route path="/folders/:albumId" element={<Photos activeTab="albums" />} />
+              <Route path="/albums" element={<Navigate to="/folders" replace />} />
+              <Route path="/albums/:albumId" element={<Photos activeTab="albums" />} />
+              <Route path="/storage" element={<StoragePage />} />
+              <Route path="/trash" element={<Photos activeTab="trash" />} />
+              <Route path="/profile" element={<Profile />} />
+            </Route>
 
-          <Route element={<ProtectedRoute requireAdmin={true}><Layout /></ProtectedRoute>}>
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<Placeholder title="Manage Users" />} />
-            <Route path="/admin/photos" element={<AdminPhotos />} />
-          </Route>
-        </Routes>
+            <Route element={<ProtectedRoute requireAdmin={true}><Layout /></ProtectedRoute>}>
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/users" element={<Placeholder title="Manage Users" />} />
+              <Route path="/admin/photos" element={<AdminPhotos />} />
+            </Route>
+          </Routes>
+        </SecurityProvider>
       </AuthProvider>
     </Router>
   );

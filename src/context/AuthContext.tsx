@@ -24,33 +24,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Supabase session check failed:", err);
         setLoading(false);
-      }
-    });
+      });
 
     // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setLoading(false);
-      }
-    });
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+          setLoading(false);
+        }
+      });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    } catch (err) {
+      console.error("Failed to register auth state change listener:", err);
+      setLoading(false);
+    }
   }, []);
 
   const fetchProfile = async (userId: string) => {
     try {
-      const API_URL = import.meta.env.VITE_APP_URL || '';
-      const res = await fetch(`${API_URL}/api/profile?id=${userId}`);
+      const res = await fetch(`/api/profile?id=${userId}`);
       
       if (res.ok) {
         const { profile } = await res.json();
@@ -60,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
           try {
-            const createRes = await fetch(`${API_URL}/api/profile`, {
+            const createRes = await fetch(`/api/profile`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -85,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (e) {
-      console.error(e);
+      console.error("Failed to fetch profile:", e);
     } finally {
       setLoading(false);
     }

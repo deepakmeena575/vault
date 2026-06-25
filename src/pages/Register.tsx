@@ -51,11 +51,8 @@ export const Register: React.FC = () => {
          try {
            console.log('PROFILE_POST_START');
            console.log('authData.user.id:', authData.user.id);
-           const API_URL = import.meta.env.VITE_APP_URL || '';
-           console.log('API_URL value:', API_URL);
-           console.log('fetch URL being called:', `${API_URL}/api/profile`);
            
-           const res = await fetch(`${API_URL}/api/profile`, {
+           const res = await fetch(`/api/profile`, {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
              body: JSON.stringify({
