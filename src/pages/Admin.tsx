@@ -20,20 +20,18 @@ export const AdminDashboard: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const [{ count: usersCount }, { count: photosCount }, { data: recentPhotos }, { data: usersList }] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('photos').select('*', { count: 'exact', head: true }),
-        supabase.from('photos').select('*, profiles(full_name)').order('uploaded_at', { ascending: false }).limit(5),
-        supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(10)
-      ]);
-
-      setStats({
-        totalUsers: usersCount || 0,
-        totalPhotos: photosCount || 0,
-        totalStorageUsed: 'N/A (Supabase)',
-        recentUploads: recentPhotos || [],
-        users: usersList || []
-      });
+      const res = await fetch('/api/admin/stats');
+      if (!res.ok) throw new Error("Failed to load admin stats");
+      const data = await res.json();
+      if (data.success) {
+        setStats({
+          totalUsers: data.totalUsers,
+          totalPhotos: data.totalPhotos,
+          totalStorageUsed: 'N/A (Supabase)',
+          recentUploads: data.recentUploads || [],
+          users: data.users || []
+        });
+      }
     } catch (e) {
       console.error("Failed to load admin stats", e);
     } finally {
@@ -112,13 +110,21 @@ export const AdminDashboard: React.FC = () => {
             <h3 className="text-lg font-bold text-slate-900">User List</h3>
           </div>
           <div className="p-6 overflow-y-auto space-y-4">
-            {stats.users.length > 0 ? stats.users.map(u => (
+            {stats.users.length > 0 ? stats.users.map((u: any) => (
               <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div>
-                  <p className="text-sm font-bold text-slate-800">{u.full_name}</p>
-                  <p className="text-xs text-slate-500">{u.email}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">{u.full_name || 'Anonymous'}</p>
+                  <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                  <div className="flex gap-4 mt-1.5 text-[11px] text-slate-500 font-medium">
+                    <span>Photos: <strong className="text-slate-800">{u.photo_count ?? 0}</strong></span>
+                    {u.latest_upload_date ? (
+                      <span>Last Upload: <strong className="text-slate-800">{new Date(u.latest_upload_date).toLocaleDateString()}</strong></span>
+                    ) : (
+                      <span className="text-slate-400">No uploads</span>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs font-semibold uppercase tracking-wider px-2 py-1 bg-white border border-slate-200 rounded-md text-slate-600">
+                <div className="text-xs font-semibold uppercase tracking-wider px-2 py-1 bg-white border border-slate-200 rounded-md text-slate-600 shrink-0 ml-2">
                   {u.role}
                 </div>
               </div>

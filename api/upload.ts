@@ -88,16 +88,12 @@ export default async function handler(req: any, res: any) {
 
     console.log('[Upload] Starting Supabase database insert');
     
-    // Generate a temporary signed URL for immediate use if needed
-    const { data: signedUrlData } = await supabase.storage.from('photos').createSignedUrl(storagePath, 60 * 60);
-    const fileUrl = signedUrlData?.signedUrl || '';
-
     const insertData = {
       user_id,
       folder_id: folder_id || null,
       file_name: file.originalname,
       storage_path: storagePath,
-      file_url: fileUrl
+      file_url: null
     };
       
     const { data, error } = await supabase.from('photos').insert(insertData).select().single();
@@ -116,7 +112,7 @@ export default async function handler(req: any, res: any) {
       photo: data, 
       success: true, 
       file_name: file.originalname, 
-      file_url: fileUrl, 
+      file_url: null, 
       storage_path: storagePath 
     });
 

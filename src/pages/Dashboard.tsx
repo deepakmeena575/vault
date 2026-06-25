@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { optimizeImage, checkDuplicateUpload, validateFile } from '../lib/optimization';
+import { populatePhotosWithSignedUrls } from '../lib/signedUrlCache';
 
 export const Dashboard: React.FC = () => {
   const { user, profile } = useAuth();
@@ -74,26 +75,8 @@ export const Dashboard: React.FC = () => {
       setStorageSize(totalStorage);
 
       if (recent && recent.length > 0) {
-        // Fetch signed URLs in batch
-        const paths = recent.map(p => p.storage_path).filter(Boolean);
-        if (paths.length > 0) {
-          const { data: urlData, error: urlError } = await supabase.storage
-            .from('photos')
-            .createSignedUrls(paths, 3600);
-
-          if (!urlError && urlData) {
-            const urlMap = new Map(urlData.map(item => [item.path, item.signedUrl]));
-            const recentWithUrls = recent.map(p => ({
-              ...p,
-              file_url: urlMap.get(p.storage_path) || p.file_url
-            }));
-            setRecentPhotos(recentWithUrls);
-          } else {
-            setRecentPhotos(recent);
-          }
-        } else {
-          setRecentPhotos(recent);
-        }
+        const recentWithUrls = await populatePhotosWithSignedUrls(recent);
+        setRecentPhotos(recentWithUrls);
       } else {
         setRecentPhotos([]);
       }
@@ -188,11 +171,6 @@ export const Dashboard: React.FC = () => {
       setUploadProgress(80);
       setUploadStatus('Securing database records...');
 
-      // Get signed URL for gallery rendering
-      const { data: signedData } = await supabase.storage
-        .from('photos')
-        .createSignedUrl(previewPath, 3600);
-
       // Insert photo metadata pointing storage_path to the fast WebP preview path
       const { error: insertError } = await supabase
         .from('photos')
@@ -200,7 +178,7 @@ export const Dashboard: React.FC = () => {
           user_id: user.id,
           file_name: file.name,
           storage_path: previewPath, // Gallery loads this path (fast preview)
-          file_url: signedData?.signedUrl || ''
+          file_url: null
         });
 
       if (insertError) throw insertError;

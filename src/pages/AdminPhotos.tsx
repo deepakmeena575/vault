@@ -14,11 +14,11 @@ export const AdminPhotos: React.FC = () => {
 
   const fetchPhotos = async () => {
     try {
-      const { data, error } = await supabase.from('photos').select('*, profiles(full_name)').order('uploaded_at', { ascending: false });
-      if (!error && data) {
-        setPhotos(data);
-      } else if (error) {
-         console.error("Supabase query error", error);
+      const res = await fetch('/api/admin/photos');
+      if (!res.ok) throw new Error("Failed to load admin photos");
+      const resData = await res.json();
+      if (resData.success) {
+        setPhotos(resData.photos || []);
       }
     } catch (e) {
       console.error("Failed to load admin photos", e);

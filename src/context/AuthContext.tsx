@@ -57,19 +57,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const fetchWithRetry = async (url: string, options?: RequestInit, retries = 3, delay = 1000): Promise<Response> => {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      if (retries > 0) {
+        console.warn(`Fetch failed for ${url}. Retrying in ${delay}ms... (${retries} retries left)`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return fetchWithRetry(url, options, retries - 1, delay * 1.5);
+      }
+      throw err;
+    }
+  };
+
   const fetchProfile = async (userId: string) => {
     try {
-      const res = await fetch(`/api/profile?id=${userId}`);
+      const res = await fetchWithRetry(`/api/profile?id=${userId}`);
       
       if (res.ok) {
         const { profile } = await res.json();
         setProfile(profile);
+        console.log("PROFILE_DATA", profile);
+        console.log("PROFILE_ROLE", profile?.role);
       } else {
-        // Profile not found, let's try to create one based on auth user data via API
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
-          try {
-            const createRes = await fetch(`/api/profile`, {
+        try {
+          // Profile not found, let's try to create one based on auth user data via API
+          const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+          if (userError) {
+            console.error("Supabase auth.getUser error during auto-profile creation:", userError);
+          }
+          if (authUser) {
+            const createRes = await fetchWithRetry(`/api/profile`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -84,13 +102,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const resData = await createRes.json();
               if (resData.success && resData.profile) {
                 setProfile(resData.profile);
+                console.log("PROFILE_DATA", resData.profile);
+                console.log("PROFILE_ROLE", resData.profile?.role);
                 setLoading(false);
                 return;
               }
             }
-          } catch(apiError) {
-             console.error("Failed to auto-create profile via API.", apiError);
           }
+        } catch (apiError) {
+          console.error("Failed to auto-create profile via API.", apiError);
         }
       }
     } catch (e) {

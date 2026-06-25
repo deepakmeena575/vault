@@ -63,16 +63,12 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
       return res.status(500).json({ error: "Failed to upload to storage", details: uploadError, success: false });
     }
     
-    // Generate a temporary signed URL for immediate use if needed
-    const { data: signedUrlData } = await supabase.storage.from('photos').createSignedUrl(storagePath, 60 * 60);
-    const fileUrl = signedUrlData?.signedUrl || '';
-
     const insertData = {
       user_id,
       folder_id: folder_id || null,
       file_name: file.originalname,
       storage_path: storagePath,
-      file_url: fileUrl
+      file_url: null
     };
       
     const { data, error } = await supabase.from('photos').insert(insertData).select().single();
@@ -87,7 +83,7 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
       photo: data, 
       success: true, 
       file_name: file.originalname, 
-      file_url: fileUrl, 
+      file_url: null, 
       storage_path: storagePath 
     });
 
@@ -207,6 +203,119 @@ app.post("/api/delete-account", async (req, res) => {
   } catch (error: any) {
     console.error("[DeleteAccount] Fatal deletion error:", error);
     res.status(500).json({ error: error.message || "Account deletion failed", success: false });
+  }
+});
+
+// 5. Admin Statistics API (bypasses RLS limits)
+app.get("/api/admin/stats", async (req, res) => {
+  try {
+    console.log("[AdminStats] Fetching all admin stats...");
+    
+    // A. Fetch all profiles using service role
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (profilesError) {
+      console.error("[AdminStats] Profiles query error:", profilesError);
+      throw profilesError;
+    }
+
+    // B. Fetch all photos using service role
+    const { data: photos, error: photosError } = await supabase
+      .from('photos')
+      .select('*, profiles(id, full_name, email)')
+      .order('uploaded_at', { ascending: false });
+
+    if (photosError) {
+      console.error("[AdminStats] Photos query error:", photosError);
+      throw photosError;
+    }
+
+    const totalUsers = profiles.length;
+    const totalPhotos = photos.length;
+
+    // C. Map profiles to aggregate stats: photo count & latest upload date
+    const usersWithStats = profiles.map(profile => {
+      const userPhotos = photos.filter(p => p.user_id === profile.id);
+      const photoCount = userPhotos.length;
+      const latestUpload = userPhotos.length > 0 ? userPhotos[0].uploaded_at : null;
+      return {
+        ...profile,
+        photo_count: photoCount,
+        latest_upload_date: latestUpload
+      };
+    });
+
+    // D. Fetch signed URLs for the top 5 recent uploads in batch
+    const recentRaw = photos.slice(0, 5);
+    let recentUploads = [...recentRaw];
+    const paths = recentRaw.map(p => p.storage_path).filter(Boolean);
+    if (paths.length > 0) {
+      const { data: urlData, error: urlError } = await supabase.storage
+        .from('photos')
+        .createSignedUrls(paths, 3600);
+
+      if (!urlError && urlData) {
+        const urlMap = new Map(urlData.map(item => [item.path, item.signedUrl]));
+        recentUploads = recentRaw.map(p => ({
+          ...p,
+          file_url: urlMap.get(p.storage_path) || null
+        }));
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      totalUsers,
+      totalPhotos,
+      users: usersWithStats,
+      recentUploads
+    });
+  } catch (error: any) {
+    console.error("[AdminStats] Fatal stats collection exception:", error);
+    res.status(500).json({ error: error.message || "Failed to load admin stats", success: false });
+  }
+});
+
+// 6. Admin Photos API (bypasses RLS limits & maps signed URLs)
+app.get("/api/admin/photos", async (req, res) => {
+  try {
+    console.log("[AdminPhotos] Fetching all photos...");
+    const { data: photos, error: photosError } = await supabase
+      .from('photos')
+      .select('*, profiles(id, full_name, email)')
+      .order('uploaded_at', { ascending: false });
+
+    if (photosError) {
+      console.error("[AdminPhotos] Photos query error:", photosError);
+      throw photosError;
+    }
+
+    let resolvedPhotos = photos || [];
+    const paths = resolvedPhotos.map(p => p.storage_path).filter(Boolean);
+    if (paths.length > 0) {
+      const { data: urlData, error: urlError } = await supabase.storage
+        .from('photos')
+        .createSignedUrls(paths, 3600);
+
+      if (!urlError && urlData) {
+        const urlMap = new Map(urlData.map(item => [item.path, item.signedUrl]));
+        resolvedPhotos = resolvedPhotos.map(p => ({
+          ...p,
+          file_url: urlMap.get(p.storage_path) || null
+        }));
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      photos: resolvedPhotos
+    });
+  } catch (error: any) {
+    console.error("[AdminPhotos] Fatal admin photos collection exception:", error);
+    res.status(500).json({ error: error.message || "Failed to load admin photos", success: false });
   }
 });
 

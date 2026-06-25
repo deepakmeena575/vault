@@ -38,9 +38,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { optimizeImage, checkDuplicateUpload, getOriginalStoragePath, validateFile } from '../lib/optimization';
+import { populatePhotosWithSignedUrls, getSignedUrl } from '../lib/signedUrlCache';
 
 // Static caches to prevent re-generating signed URLs during tab changes/scrolls
-const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const folderCoverCache = new Map<string, string>();
 
 interface UploadQueueItem {
@@ -379,13 +379,11 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
 
           if (!error && data && data.length > 0 && data[0].storage_path) {
             const path = data[0].storage_path;
-            const { data: urlData } = await supabase.storage
-              .from('photos')
-              .createSignedUrl(path, 3600);
+            const signedUrl = await getSignedUrl(path, 3600);
             
-            if (urlData?.signedUrl) {
-              folderCoverCache.set(folder.id, urlData.signedUrl);
-              updatedCovers[folder.id] = urlData.signedUrl;
+            if (signedUrl) {
+              folderCoverCache.set(folder.id, signedUrl);
+              updatedCovers[folder.id] = signedUrl;
             }
           }
         }));
@@ -398,54 +396,7 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
 
   // Signed URL caching & Batch loader
   const getSignedUrlsForPhotos = async (photosList: Photo[]): Promise<Photo[]> => {
-    const now = Date.now();
-    const pathsToSign: string[] = [];
-    const resultPhotos = [...photosList];
-
-    photosList.forEach((photo) => {
-      if (!photo.storage_path) return;
-      const cached = signedUrlCache.get(photo.storage_path);
-      if (cached && cached.expiresAt > now + 10 * 60 * 1000) {
-        photo.file_url = cached.url;
-      } else {
-        pathsToSign.push(photo.storage_path);
-      }
-    });
-
-    if (pathsToSign.length === 0) {
-      return resultPhotos;
-    }
-
-    try {
-      const { data, error } = await supabase.storage
-        .from('photos')
-        .createSignedUrls(pathsToSign, 3600);
-
-      if (!error && data) {
-        data.forEach((item) => {
-          if (item.signedUrl) {
-            signedUrlCache.set(item.path, {
-              url: item.signedUrl,
-              expiresAt: Date.now() + 3600 * 1000,
-            });
-          }
-        });
-
-        return resultPhotos.map((photo) => {
-          if (photo.storage_path) {
-            const cached = signedUrlCache.get(photo.storage_path);
-            if (cached) {
-              return { ...photo, file_url: cached.url };
-            }
-          }
-          return photo;
-        });
-      }
-    } catch (err) {
-      console.error("Batch signing failed:", err);
-    }
-
-    return resultPhotos;
+    return populatePhotosWithSignedUrls(photosList);
   };
 
   const fetchPhotos = async (reset: boolean = false) => {
@@ -628,15 +579,12 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
         }
 
         updateStatus('saving', 85);
-        const { data: signedData } = await supabase.storage
-          .from('photos')
-          .createSignedUrl(previewPath, 60 * 60);
 
         const insertPayload: any = {
           user_id: user.id,
           file_name: currentFile.name,
           storage_path: previewPath,
-          file_url: signedData?.signedUrl || ''
+          file_url: null
         };
 
         if (selectedFolder) {
@@ -746,15 +694,12 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
         }
 
         updateStatus('saving', 85);
-        const { data: signedData } = await supabase.storage
-          .from('photos')
-          .createSignedUrl(previewPath, 60 * 60);
 
         const insertPayload: any = {
           user_id: user.id,
           file_name: currentFile.name,
           storage_path: previewPath,
-          file_url: signedData?.signedUrl || '',
+          file_url: null,
           folder_id: targetFolderId
         };
 
@@ -956,16 +901,12 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
       const photo = downloadList[i];
       try {
         const originalPath = getOriginalStoragePath(photo);
-        const { data, error } = await supabase.storage
-          .from('photos')
-          .createSignedUrl(originalPath, 60);
+        const signedUrl = await getSignedUrl(originalPath, 60);
 
-        if (error) throw error;
-
-        if (data?.signedUrl) {
+        if (signedUrl) {
           await new Promise(r => setTimeout(r, 150));
           const trigger = document.createElement('a');
-          trigger.href = data.signedUrl;
+          trigger.href = signedUrl;
           trigger.download = photo.file_name;
           trigger.target = '_blank';
           document.body.appendChild(trigger);
@@ -992,15 +933,11 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
   const handleDownloadOriginal = async (photo: Photo) => {
     try {
       const originalPath = getOriginalStoragePath(photo);
-      const { data, error } = await supabase.storage
-        .from('photos')
-        .createSignedUrl(originalPath, 60);
+      const signedUrl = await getSignedUrl(originalPath, 60);
       
-      if (error) throw error;
-      
-      if (data?.signedUrl) {
+      if (signedUrl) {
         const trigger = document.createElement('a');
-        trigger.href = data.signedUrl;
+        trigger.href = signedUrl;
         trigger.download = photo.file_name;
         trigger.target = '_blank';
         document.body.appendChild(trigger);
@@ -1707,6 +1644,14 @@ export const Photos: React.FC<PhotosProps> = ({ activeTab = 'photos' }) => {
                     </div>
                   );
                 })}
+              </div>
+            ) : loadingPhotos ? (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-0.5 sm:gap-1">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="aspect-square bg-slate-100 animate-pulse rounded-sm relative">
+                    <div className="absolute inset-0 bg-slate-200/60"></div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="py-16 text-center bg-slate-50 rounded-2xl border border-slate-100 px-4">
